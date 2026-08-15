@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { ApiError, getHome, type Category, type ProductCard } from './api'
 import { useCartStore } from './cart'
 import { useDiscoverStore } from './discover'
+import { useEngagementStore } from './engagement'
 import { useOrderStore } from './orders'
 import { useSessionStore } from './session'
 
@@ -10,6 +11,7 @@ const session = useSessionStore()
 const cart = useCartStore()
 const orders = useOrderStore()
 const discover = useDiscoverStore()
+const engagement = useEngagementStore()
 const categories = ref<Array<Category & { caption: string }>>([])
 const products = ref<Array<ProductCard & { tag: string }>>([])
 const heroImage = ref('')
@@ -29,6 +31,18 @@ const receiverPhone = ref('')
 const addressLine = ref('')
 const customerNote = ref('')
 const selectedCouponId = ref<number | null>(null)
+const favoritesOpen = ref(false)
+const afterSaleOpen = ref(false)
+const afterSaleReason = ref('NOT_AS_EXPECTED')
+const afterSaleDescription = ref('')
+const returnCarrier = ref('顺丰速运')
+const returnTrackingNo = ref('')
+const reviewOpen = ref(false)
+const reviewOrderNo = ref('')
+const reviewOrderItemId = ref<number | null>(null)
+const reviewProductName = ref('')
+const reviewRating = ref(5)
+const reviewContent = ref('')
 
 const authTitle = computed(() => authMode.value === 'login' ? '欢迎回来' : '加入 Aurora')
 const selectedCoupon = computed(() => discover.myCoupons.find(
@@ -41,6 +55,9 @@ const checkoutDiscount = computed(() => {
     : 0
 })
 const checkoutPayable = computed(() => Math.max(0, (cart.checkout?.payableAmount ?? 0) - checkoutDiscount.value))
+const activeAfterSale = computed(() => orders.active
+  ? engagement.afterSaleForOrder(orders.active.orderNo)
+  : null)
 
 const tags = ['设计师精选', '本周热销', '新品首发', '会员专享']
 
@@ -79,6 +96,7 @@ function logout() {
   cart.reset()
   orders.reset()
   discover.reset()
+  engagement.reset()
   accountMenuOpen.value = false
 }
 
@@ -96,6 +114,7 @@ async function submitAuth() {
     void cart.load().catch(() => undefined)
     discover.connectNotifications()
     void discover.loadNotifications().catch(() => undefined)
+    void engagement.load().catch(() => undefined)
   } catch (error) {
     authError.value = error instanceof ApiError
       ? error.message
@@ -236,6 +255,20 @@ async function addRecommendation(skuId: number, productId: number) {
   await addToCart(skuId, productId)
 }
 
+async function toggleFavorite(productId: number) {
+  if (!session.authenticated) {
+    authOpen.value = true
+    return
+  }
+  await engagement.toggleFavorite(productId).catch(() => undefined)
+}
+
+async function openFavorites() {
+  accountMenuOpen.value = false
+  favoritesOpen.value = true
+  await engagement.load().catch(() => undefined)
+}
+
 async function mockPay() {
   try {
     await orders.pay()
@@ -248,7 +281,7 @@ async function openOrders() {
   accountMenuOpen.value = false
   orders.drawerOpen = true
   try {
-    await orders.load()
+    await Promise.all([orders.load(), engagement.load()])
   } catch {
     // The order drawer presents the actionable error.
   }
@@ -278,9 +311,65 @@ async function confirmOrder(orderNo: string) {
   }
 }
 
+function openAfterSale() {
+  afterSaleReason.value = 'NOT_AS_EXPECTED'
+  afterSaleDescription.value = ''
+  returnTrackingNo.value = ''
+  afterSaleOpen.value = true
+}
+
+async function submitAfterSale() {
+  if (!orders.active) return
+  try {
+    if (activeAfterSale.value?.status === 'WAITING_RETURN') {
+      await engagement.submitReturn(
+        activeAfterSale.value.afterSaleNo, returnCarrier.value, returnTrackingNo.value,
+      )
+    } else {
+      const type = orders.active.status === 'PAID' ? 'REFUND_ONLY' : 'RETURN_REFUND'
+      await engagement.applyAfterSale(
+        orders.active.orderNo, type, afterSaleReason.value, afterSaleDescription.value,
+      )
+      await orders.load()
+    }
+    afterSaleOpen.value = false
+  } catch {
+    // The after-sale dialog presents the actionable error.
+  }
+}
+
+function openReview(orderNo: string, orderItemId: number, productName: string) {
+  reviewOrderNo.value = orderNo
+  reviewOrderItemId.value = orderItemId
+  reviewProductName.value = productName
+  reviewRating.value = 5
+  reviewContent.value = ''
+  reviewOpen.value = true
+}
+
+async function submitReview() {
+  if (reviewOrderItemId.value == null) return
+  try {
+    await engagement.createReview(
+      reviewOrderNo.value, reviewOrderItemId.value, reviewRating.value, reviewContent.value,
+    )
+    reviewOpen.value = false
+  } catch {
+    // The review dialog presents the actionable error.
+  }
+}
+
 function orderStatus(status: string) {
   return ({
-    PENDING_PAYMENT: '待支付', PAID: '待发货', SHIPPED: '运输中', COMPLETED: '已完成', CLOSED: '已关闭',
+    PENDING_PAYMENT: '待支付', PAID: '待发货', SHIPPED: '运输中', COMPLETED: '已完成',
+    REFUNDING: '售后中', REFUNDED: '已退款', CLOSED: '已关闭',
+  } as Record<string, string>)[status] ?? status
+}
+
+function afterSaleStatus(status: string) {
+  return ({
+    PENDING_REVIEW: '待审核', APPROVED: '待退款', WAITING_RETURN: '待寄回',
+    RETURNED: '待退款', REJECTED: '已驳回', REFUNDED: '已退款',
   } as Record<string, string>)[status] ?? status
 }
 
@@ -294,7 +383,7 @@ onMounted(() => {
     await cart.load()
     if (session.authenticated) {
       discover.connectNotifications()
-      await discover.loadNotifications()
+      await Promise.all([discover.loadNotifications(), engagement.load()])
     }
   }).catch(() => undefined)
 })
@@ -329,6 +418,7 @@ const stories = [
           <strong>{{ session.user.displayName }}</strong>
           <span>{{ session.user.email }}</span>
           <button @click="openOrders">我的订单</button>
+          <button @click="openFavorites">我的收藏</button>
           <button @click="logout">退出登录</button>
         </div>
         <button class="cart" aria-label="购物车" @click="openCart">购物袋 <b>{{ cart.data.totalQuantity }}</b></button>
@@ -385,7 +475,7 @@ const stories = [
             <div class="product-image">
               <img :src="product.coverImageUrl" :alt="product.name" />
               <span class="product-tag">{{ product.tag }}</span>
-              <button class="favorite" aria-label="收藏">♡</button>
+              <button class="favorite" :class="{ active: engagement.isFavorite(product.id) }" :aria-label="engagement.isFavorite(product.id) ? '取消收藏' : '收藏'" @click="toggleFavorite(product.id)">{{ engagement.isFavorite(product.id) ? '♥' : '♡' }}</button>
               <button class="quick-add" :disabled="product.defaultSkuId == null" @click="addToCart(product.defaultSkuId, product.id)">快速加入购物袋</button>
             </div>
             <p>{{ product.brandName }}</p>
@@ -555,7 +645,7 @@ const stories = [
           <section v-if="orders.active" class="order-detail">
             <div class="order-detail-head"><span>订单 {{ orders.active.orderNo }}</span><b>{{ orderStatus(orders.active.status) }}</b></div>
             <article v-for="item in orders.active.items" :key="item.id">
-              <img :src="item.imageUrl" :alt="item.productName" /><div><strong>{{ item.productName }}</strong><span>{{ item.skuName }} · ×{{ item.quantity }}</span></div><b>¥{{ item.payableAmount.toLocaleString() }}</b>
+              <img :src="item.imageUrl" :alt="item.productName" /><div><strong>{{ item.productName }}</strong><span>{{ item.skuName }} · ×{{ item.quantity }}</span><button v-if="orders.active.status === 'COMPLETED' && !engagement.reviewed(item.id)" class="line-review" @click="openReview(orders.active.orderNo, item.id, item.productName)">发表评价</button><small v-if="engagement.reviewed(item.id)" class="reviewed">已评价</small></div><b>¥{{ item.payableAmount.toLocaleString() }}</b>
             </article>
             <div class="order-address"><span>配送至</span><strong>{{ orders.active.receiverName }} · {{ orders.active.receiverPhone }}</strong><p>{{ orders.active.addressLine }}</p></div>
             <div v-if="orders.shipment" class="shipment-card">
@@ -565,14 +655,62 @@ const stories = [
             <div class="order-timeline">
               <p v-for="log in orders.active.timeline" :key="log.createdAt"><i></i><span><b>{{ orderStatus(log.toStatus) }}</b>{{ log.remark }}</span><small>{{ formatTime(log.createdAt) }}</small></p>
             </div>
+            <div v-if="activeAfterSale" class="after-sale-card">
+              <span>售后 {{ activeAfterSale.afterSaleNo }}</span><strong>{{ afterSaleStatus(activeAfterSale.status) }}</strong>
+              <p>{{ activeAfterSale.adminNote || activeAfterSale.description }}</p>
+              <small>退款金额 ¥{{ activeAfterSale.refundAmount.toLocaleString() }}</small>
+            </div>
             <div class="order-actions">
               <button v-if="orders.active.status === 'PENDING_PAYMENT'" @click="orders.paymentOpen = true">立即支付</button>
               <button v-if="orders.active.status === 'PENDING_PAYMENT'" class="secondary" @click="cancelOrder(orders.active.orderNo)">取消订单</button>
               <button v-if="orders.active.status === 'SHIPPED'" @click="confirmOrder(orders.active.orderNo)">确认收货</button>
+              <button v-if="!activeAfterSale && ['PAID', 'SHIPPED', 'COMPLETED'].includes(orders.active.status)" class="secondary" @click="openAfterSale">{{ orders.active.status === 'PAID' ? '申请退款' : '申请退货退款' }}</button>
+              <button v-if="activeAfterSale?.status === 'WAITING_RETURN'" @click="openAfterSale">填写寄回信息</button>
             </div>
           </section>
         </div>
       </aside>
+    </div>
+
+    <div v-if="favoritesOpen" class="cart-overlay favorite-overlay" @click.self="favoritesOpen = false">
+      <aside class="favorite-drawer" aria-label="我的收藏">
+        <header><div><p class="eyebrow">SAVED FOR LATER</p><h2>我的收藏 <span>{{ engagement.favorites.length }}</span></h2></div><button aria-label="关闭收藏" @click="favoritesOpen = false">×</button></header>
+        <div v-if="engagement.error" class="cart-error">{{ engagement.error }}</div>
+        <div v-if="!engagement.favorites.length" class="empty-cart"><strong>还没有收藏</strong><p>遇见喜欢的商品，就先把它留在这里。</p></div>
+        <div v-else class="favorite-list">
+          <article v-for="item in engagement.favorites" :key="item.productId"><img :src="item.imageUrl" :alt="item.productName" /><div><strong>{{ item.productName }}</strong><span>¥{{ item.salePrice?.toLocaleString() }}</span><button :disabled="item.defaultSkuId == null" @click="addToCart(item.defaultSkuId, item.productId)">加入购物袋</button><button class="text" @click="toggleFavorite(item.productId)">移除</button></div></article>
+        </div>
+      </aside>
+    </div>
+
+    <div v-if="afterSaleOpen && orders.active" class="auth-overlay trade-overlay" @click.self="afterSaleOpen = false">
+      <form class="auth-dialog service-dialog" role="dialog" aria-modal="true" aria-label="申请售后" @submit.prevent="submitAfterSale">
+        <button class="auth-close" type="button" aria-label="关闭售后" @click="afterSaleOpen = false">×</button>
+        <p class="eyebrow">AURORA CARE</p>
+        <template v-if="activeAfterSale?.status === 'WAITING_RETURN'">
+          <h2>填写寄回信息</h2><p>请填写物流公司和运单号，运营确认收货后将完成退款。</p>
+          <label>物流公司<input v-model.trim="returnCarrier" required maxlength="80" placeholder="例如：顺丰速运" /></label>
+          <label>寄回运单号<input v-model.trim="returnTrackingNo" required maxlength="100" placeholder="请输入运单号" /></label>
+        </template>
+        <template v-else>
+          <h2>{{ orders.active.status === 'PAID' ? '申请退款' : '申请退货退款' }}</h2><p>本次为整单售后，预计退款 ¥{{ orders.active.payableAmount.toLocaleString() }}。</p>
+          <label>售后原因<select v-model="afterSaleReason"><option value="NOT_AS_EXPECTED">商品与预期不符</option><option value="QUALITY_ISSUE">商品质量问题</option><option value="ORDER_BY_MISTAKE">误拍或不再需要</option></select></label>
+          <label>问题描述<textarea v-model.trim="afterSaleDescription" required maxlength="1000" placeholder="请描述具体情况，方便运营快速审核"></textarea></label>
+        </template>
+        <div v-if="engagement.error" class="auth-error">{{ engagement.error }}</div>
+        <button class="auth-submit" :disabled="engagement.loading">{{ engagement.loading ? '正在提交…' : activeAfterSale?.status === 'WAITING_RETURN' ? '提交寄回信息' : '提交售后申请' }}</button>
+      </form>
+    </div>
+
+    <div v-if="reviewOpen" class="auth-overlay trade-overlay" @click.self="reviewOpen = false">
+      <form class="auth-dialog service-dialog" role="dialog" aria-modal="true" aria-label="发表评价" @submit.prevent="submitReview">
+        <button class="auth-close" type="button" aria-label="关闭评价" @click="reviewOpen = false">×</button>
+        <p class="eyebrow">SHARE YOUR EXPERIENCE</p><h2>评价 {{ reviewProductName }}</h2><p>真实体验会帮助更多人做出更好的选择。</p>
+        <label>商品评分<select v-model="reviewRating"><option :value="5">★★★★★ 非常满意</option><option :value="4">★★★★☆ 满意</option><option :value="3">★★★☆☆ 一般</option><option :value="2">★★☆☆☆ 待改善</option><option :value="1">★☆☆☆☆ 不满意</option></select></label>
+        <label>体验分享<textarea v-model.trim="reviewContent" required maxlength="1000" placeholder="聊聊设计、质感和实际使用感受"></textarea></label>
+        <div v-if="engagement.error" class="auth-error">{{ engagement.error }}</div>
+        <button class="auth-submit" :disabled="engagement.loading">{{ engagement.loading ? '正在发布…' : '发布评价' }}</button>
+      </form>
     </div>
 
     <div v-if="discover.discoverOpen" class="discovery-overlay" @click.self="discover.discoverOpen = false">

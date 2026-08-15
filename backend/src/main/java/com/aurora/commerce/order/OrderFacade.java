@@ -218,6 +218,74 @@ public class OrderFacade {
         return expired;
     }
 
+    @Transactional
+    public AfterSaleOrder beginAfterSale(Long userId, String orderNo, String type) {
+        CustomerOrder order = lockedOrder(orderNo);
+        requireOwner(order, userId);
+        OrderStatus sourceStatus = order.status();
+        boolean refundOnly = "REFUND_ONLY".equals(type) && sourceStatus == OrderStatus.PAID;
+        boolean returnRefund = "RETURN_REFUND".equals(type)
+                && (sourceStatus == OrderStatus.SHIPPED || sourceStatus == OrderStatus.COMPLETED);
+        if (!refundOnly && !returnRefund) throw stateConflict();
+        order.beginAfterSale();
+        log(order, sourceStatus, "CUSTOMER", "提交售后申请");
+        return toAfterSaleOrder(order, sourceStatus);
+    }
+
+    @Transactional
+    public void rejectAfterSale(String orderNo, String sourceStatus, String remark) {
+        CustomerOrder order = lockedOrder(orderNo);
+        OrderStatus from = order.status();
+        OrderStatus restored;
+        try {
+            restored = OrderStatus.valueOf(sourceStatus);
+        } catch (IllegalArgumentException exception) {
+            throw stateConflict();
+        }
+        order.rejectAfterSale(restored);
+        log(order, from, "ADMIN", remark);
+    }
+
+    @Transactional
+    public void completeRefund(String orderNo, String remark) {
+        CustomerOrder order = lockedOrder(orderNo);
+        if (order.status() == OrderStatus.REFUNDED) return;
+        OrderStatus from = order.status();
+        order.refund(clock.instant());
+        log(order, from, "ADMIN", remark);
+    }
+
+    @Transactional(readOnly = true)
+    public ReviewOrder reviewOrder(Long userId, String orderNo) {
+        CustomerOrder order = ownedOrder(userId, orderNo);
+        if (order.status() != OrderStatus.COMPLETED) throw stateConflict();
+        return new ReviewOrder(
+                order.id(), order.orderNo(), itemRepository.findByOrderIdOrderByIdAsc(order.id()).stream()
+                .map(item -> new ReviewOrderItem(
+                        item.id(), item.productId(), item.productName(), item.imageUrl()))
+                .toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<AfterSaleOrderItem> afterSaleItems(String orderNo) {
+        CustomerOrder order = orderRepository.findByOrderNo(orderNo).orElseThrow(this::orderNotFound);
+        return itemRepository.findByOrderIdOrderByIdAsc(order.id()).stream()
+                .map(item -> new AfterSaleOrderItem(
+                        item.id(), item.productId(), item.skuId(), item.quantity(),
+                        item.productName(), item.imageUrl()))
+                .toList();
+    }
+
+    private AfterSaleOrder toAfterSaleOrder(CustomerOrder order, OrderStatus sourceStatus) {
+        return new AfterSaleOrder(
+                order.id(), order.orderNo(), order.userId(), sourceStatus.name(), order.payableAmount(),
+                itemRepository.findByOrderIdOrderByIdAsc(order.id()).stream()
+                        .map(item -> new AfterSaleOrderItem(
+                                item.id(), item.productId(), item.skuId(), item.quantity(),
+                                item.productName(), item.imageUrl()))
+                        .toList());
+    }
+
     private void log(CustomerOrder order, OrderStatus from, String operator, String remark) {
         logRepository.save(new OrderStatusLog(
                 order.id(), from, order.status(), operator, remark, clock.instant()));
@@ -259,7 +327,7 @@ public class OrderFacade {
                 order.orderNo(), order.status().name(), items, order.goodsAmount(), order.discountAmount(),
                 order.shippingAmount(), order.payableAmount(), order.receiverName(), order.receiverPhone(),
                 order.addressLine(), order.customerNote(), order.expireAt(), order.paidAt(), order.shippedAt(),
-                order.completedAt(), order.closedAt(), order.createdAt(), timeline
+                order.completedAt(), order.closedAt(), order.refundedAt(), order.createdAt(), timeline
         );
     }
 
@@ -320,6 +388,32 @@ public class OrderFacade {
     public record OrderReference(Long orderId, String orderNo, String status) {
     }
 
+    public record AfterSaleOrder(
+            Long orderId,
+            String orderNo,
+            Long userId,
+            String sourceStatus,
+            BigDecimal refundAmount,
+            List<AfterSaleOrderItem> items
+    ) {
+    }
+
+    public record AfterSaleOrderItem(
+            Long orderItemId,
+            Long productId,
+            Long skuId,
+            int quantity,
+            String productName,
+            String imageUrl
+    ) {
+    }
+
+    public record ReviewOrder(Long orderId, String orderNo, List<ReviewOrderItem> items) {
+    }
+
+    public record ReviewOrderItem(Long orderItemId, Long productId, String productName, String imageUrl) {
+    }
+
     public record OrderItemView(
             Long id,
             Long productId,
@@ -360,6 +454,7 @@ public class OrderFacade {
             Instant shippedAt,
             Instant completedAt,
             Instant closedAt,
+            Instant refundedAt,
             Instant createdAt,
             List<StatusLogView> timeline
     ) {

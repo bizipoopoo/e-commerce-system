@@ -77,6 +77,9 @@ class CustomerOrder {
     @Column(name = "closed_at")
     private Instant closedAt;
 
+    @Column(name = "refunded_at")
+    private Instant refundedAt;
+
     @Version
     @Column(nullable = false)
     private long version;
@@ -145,11 +148,38 @@ class CustomerOrder {
         completedAt = now;
     }
 
+    void beginAfterSale() {
+        if (status != OrderStatus.PAID && status != OrderStatus.SHIPPED && status != OrderStatus.COMPLETED) {
+            throw stateConflict();
+        }
+        status = OrderStatus.REFUNDING;
+    }
+
+    void rejectAfterSale(OrderStatus sourceStatus) {
+        requireStatus(OrderStatus.REFUNDING);
+        if (sourceStatus != OrderStatus.PAID
+                && sourceStatus != OrderStatus.SHIPPED
+                && sourceStatus != OrderStatus.COMPLETED) {
+            throw stateConflict();
+        }
+        status = sourceStatus;
+    }
+
+    void refund(Instant now) {
+        requireStatus(OrderStatus.REFUNDING);
+        status = OrderStatus.REFUNDED;
+        refundedAt = now;
+    }
+
     private void requireStatus(OrderStatus expected) {
         if (status != expected) {
-            throw new BusinessException(
-                    "ORDER_STATE_CONFLICT", "当前订单状态不允许此操作", HttpStatus.CONFLICT);
+            throw stateConflict();
         }
+    }
+
+    private BusinessException stateConflict() {
+        return new BusinessException(
+                "ORDER_STATE_CONFLICT", "当前订单状态不允许此操作", HttpStatus.CONFLICT);
     }
 
     Long id() { return id; }
@@ -169,5 +199,6 @@ class CustomerOrder {
     Instant shippedAt() { return shippedAt; }
     Instant completedAt() { return completedAt; }
     Instant closedAt() { return closedAt; }
+    Instant refundedAt() { return refundedAt; }
     Instant createdAt() { return createdAt; }
 }

@@ -46,10 +46,16 @@ class ContentService {
         return toView(article);
     }
 
+    @Transactional(readOnly = true)
+    List<ArticleView> adminList() {
+        return articleRepository.findAllByOrderByCreatedAtDesc().stream().map(this::toView).toList();
+    }
+
     private ArticleView toView(ContentArticle article) {
         return new ArticleView(
                 article.id(), article.slug(), article.title(), article.summary(), article.coverImageUrl(),
-                article.contentText(), article.channelCode(), article.featured(), article.publishedAt());
+                article.contentText(), article.channelCode(), article.status().name(),
+                article.featured(), article.publishedAt());
     }
 
     private BusinessException contentNotFound() {
@@ -64,7 +70,7 @@ class ContentService {
 
     record ArticleView(
             Long id, String slug, String title, String summary, String coverImageUrl,
-            String contentText, String channelCode, boolean featured, Instant publishedAt
+            String contentText, String channelCode, String status, boolean featured, Instant publishedAt
     ) {
     }
 }

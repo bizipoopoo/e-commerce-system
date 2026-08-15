@@ -130,6 +130,13 @@ public class MarketingFacade {
         return toView(coupon, null, Instant.now());
     }
 
+    @Transactional(readOnly = true)
+    public List<CouponView> adminList() {
+        Instant now = Instant.now();
+        return couponRepository.findAllByOrderByCreatedAtDesc().stream()
+                .map(coupon -> toView(coupon, null, now)).toList();
+    }
+
     private void ensureAvailable(UserCoupon userCoupon, Coupon coupon, Instant now) {
         if (userCoupon.status() != UserCoupon.Status.AVAILABLE || !coupon.activeAt(now)) {
             throw couponNotAvailable();

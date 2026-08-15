@@ -41,6 +41,11 @@ class ContentController {
         return ApiResponse.success(contentService.create(request.toCommand()));
     }
 
+    @GetMapping("/admin/content/articles")
+    ApiResponse<List<ContentService.ArticleView>> adminList() {
+        return ApiResponse.success(contentService.adminList());
+    }
+
     @PatchMapping("/admin/content/articles/{id}/publish")
     ApiResponse<ContentService.ArticleView> publish(@PathVariable Long id) {
         return ApiResponse.success(contentService.publish(id));

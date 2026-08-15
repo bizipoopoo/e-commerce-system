@@ -5,5 +5,7 @@ enum OrderStatus {
     PAID,
     SHIPPED,
     COMPLETED,
+    REFUNDING,
+    REFUNDED,
     CLOSED
 }

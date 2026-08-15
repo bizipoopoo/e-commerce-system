@@ -96,7 +96,7 @@ export interface CheckoutPreview {
   payableAmount: number
 }
 
-export type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'SHIPPED' | 'COMPLETED' | 'CLOSED'
+export type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'SHIPPED' | 'COMPLETED' | 'REFUNDING' | 'REFUNDED' | 'CLOSED'
 
 export interface OrderItem {
   id: number
@@ -136,6 +136,7 @@ export interface CustomerOrder {
   shippedAt: string | null
   completedAt: string | null
   closedAt: string | null
+  refundedAt: string | null
   createdAt: string
   timeline: OrderTimeline[]
 }
@@ -183,6 +184,7 @@ export interface ContentArticle {
   coverImageUrl: string
   contentText: string
   channelCode: string
+  status: 'DRAFT' | 'PUBLISHED'
   featured: boolean
   publishedAt: string
 }
@@ -212,6 +214,58 @@ export interface NotificationItem {
 export interface NotificationCenter {
   items: NotificationItem[]
   unreadCount: number
+}
+
+export interface FavoriteItem {
+  productId: number
+  defaultSkuId: number | null
+  productName: string
+  imageUrl: string
+  salePrice: number
+  createdAt: string
+}
+
+export type AfterSaleStatus = 'PENDING_REVIEW' | 'APPROVED' | 'WAITING_RETURN' | 'RETURNED' | 'REJECTED' | 'REFUNDED'
+
+export interface AfterSaleItem {
+  afterSaleNo: string
+  orderNo: string
+  userId: number
+  type: 'REFUND_ONLY' | 'RETURN_REFUND'
+  sourceOrderStatus: OrderStatus
+  status: AfterSaleStatus
+  reasonCode: string
+  description: string
+  refundAmount: number
+  returnCarrier: string | null
+  returnTrackingNo: string | null
+  adminNote: string | null
+  reviewedAt: string | null
+  returnedAt: string | null
+  refundedAt: string | null
+  createdAt: string
+  refundNo: string | null
+  timeline: Array<{
+    fromStatus: AfterSaleStatus | null
+    toStatus: AfterSaleStatus
+    operatorType: string
+    remark: string
+    createdAt: string
+  }>
+}
+
+export interface ReviewItem {
+  id: number
+  userId: number
+  orderItemId: number
+  productId: number
+  rating: number
+  content: string
+  imageUrls: string | null
+  status: 'PUBLISHED' | 'HIDDEN'
+  adminReply: string | null
+  repliedAt: string | null
+  createdAt: string
 }
 
 export class ApiError extends Error {

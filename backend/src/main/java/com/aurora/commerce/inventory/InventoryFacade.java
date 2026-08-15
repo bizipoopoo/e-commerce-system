@@ -141,6 +141,23 @@ public class InventoryFacade {
     }
 
     @Transactional
+    public void restock(String businessKey, Map<Long, Integer> quantities) {
+        validateReservationRequest(businessKey, quantities);
+        List<Map.Entry<Long, Integer>> orderedLines = quantities.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey()).toList();
+        for (Map.Entry<Long, Integer> line : orderedLines) {
+            if (inventoryRepository.restock(line.getKey(), line.getValue()) != 1) {
+                throw inventoryNotFound(line.getKey());
+            }
+            Inventory inventory = inventoryRepository.findById(line.getKey())
+                    .orElseThrow(() -> inventoryNotFound(line.getKey()));
+            transactionRepository.save(new InventoryTransaction(
+                    line.getKey(), "RESTOCK", line.getValue(), inventory.totalQuantity(),
+                    inventory.reservedQuantity(), businessKey, "售后退款回补库存"));
+        }
+    }
+
+    @Transactional
     public StockView setInventory(Long skuId, int totalQuantity, int warningQuantity, String reason) {
         if (!catalogFacade.skuExists(skuId)) {
             throw new BusinessException("SKU_NOT_FOUND", "SKU 不存在: " + skuId, HttpStatus.NOT_FOUND);

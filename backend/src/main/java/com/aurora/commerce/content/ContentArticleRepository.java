@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Optional;
 
 interface ContentArticleRepository extends JpaRepository<ContentArticle, Long> {
+    List<ContentArticle> findAllByOrderByCreatedAtDesc();
     List<ContentArticle> findByStatusOrderByFeaturedDescPublishedAtDesc(ContentArticle.Status status);
     List<ContentArticle> findByStatusAndChannelCodeOrderByFeaturedDescPublishedAtDesc(
             ContentArticle.Status status, String channelCode);

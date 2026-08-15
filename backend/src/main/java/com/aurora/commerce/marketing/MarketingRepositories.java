@@ -14,6 +14,7 @@ import java.util.Optional;
 interface CouponRepository extends JpaRepository<Coupon, Long> {
     Optional<Coupon> findByCode(String code);
     List<Coupon> findByStatusOrderByCreatedAtDesc(Coupon.Status status);
+    List<Coupon> findAllByOrderByCreatedAtDesc();
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""

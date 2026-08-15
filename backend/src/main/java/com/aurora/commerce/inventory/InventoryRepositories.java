@@ -50,6 +50,15 @@ interface InventoryRepository extends JpaRepository<Inventory, Long> {
                and inventory.reservedQuantity >= :quantity
             """)
     int confirmReserved(@Param("skuId") Long skuId, @Param("quantity") int quantity);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+            update Inventory inventory
+               set inventory.totalQuantity = inventory.totalQuantity + :quantity,
+                   inventory.version = inventory.version + 1
+             where inventory.skuId = :skuId
+            """)
+    int restock(@Param("skuId") Long skuId, @Param("quantity") int quantity);
 }
 
 interface InventoryReservationRepository extends JpaRepository<InventoryReservation, Long> {

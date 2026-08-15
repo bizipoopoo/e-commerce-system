@@ -59,3 +59,7 @@ npm run dev:admin
 - [一周交付计划](docs/05-delivery-plan.md)
 - [阶段研发与 Code Review 流程](docs/06-engineering-workflow.md)
 - [Stage 02：身份、商品与首页数据化](docs/stages/stage-02-identity-catalog.md)
+- [Stage 03：库存、购物车与结算预览](docs/stages/stage-03-inventory-cart-checkout.md)
+- [Stage 04：订单、支付与履约](docs/stages/stage-04-orders-payments-fulfillment.md)
+- [Stage 05：营销、内容、推荐与消息](docs/stages/stage-05-marketing-content-recommendation-notifications.md)
+- [Stage 06：售后、互动与运营工作台](docs/stages/stage-06-after-sales-engagement-operations.md)

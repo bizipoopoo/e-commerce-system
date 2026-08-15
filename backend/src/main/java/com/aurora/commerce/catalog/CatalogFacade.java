@@ -66,6 +66,31 @@ public class CatalogFacade {
     }
 
     @Transactional(readOnly = true)
+    public boolean productExists(Long productId) {
+        return productRepository.findById(productId)
+                .filter(product -> product.status() == ProductStatus.PUBLISHED)
+                .isPresent();
+    }
+
+    @Transactional(readOnly = true)
+    public Map<Long, ProductSummary> productSummaries(Collection<Long> productIds) {
+        List<Product> products = productRepository.findAllById(productIds).stream()
+                .filter(product -> product.status() == ProductStatus.PUBLISHED).toList();
+        Map<Long, List<ProductSku>> skus = skuRepository.findByProductIdInAndStatus(
+                        products.stream().map(Product::id).toList(), SkuStatus.ACTIVE).stream()
+                .collect(Collectors.groupingBy(ProductSku::productId));
+        Map<Long, ProductSummary> result = new LinkedHashMap<>();
+        products.forEach(product -> {
+            ProductSku defaultSku = skus.getOrDefault(product.id(), List.of()).stream()
+                    .min(Comparator.comparing(ProductSku::salePrice)).orElse(null);
+            result.put(product.id(), new ProductSummary(
+                    product.id(), defaultSku == null ? null : defaultSku.id(), product.name(),
+                    product.coverImageUrl(), defaultSku == null ? BigDecimal.ZERO : defaultSku.salePrice()));
+        });
+        return result;
+    }
+
+    @Transactional(readOnly = true)
     public List<RecommendationCandidate> recommendationCandidates() {
         List<Product> products = productRepository.findTop20ByStatusOrderBySalesCountDesc(ProductStatus.PUBLISHED);
         Map<Long, List<ProductSku>> skus = skuRepository.findByProductIdInAndStatus(
@@ -126,6 +151,11 @@ public class CatalogFacade {
             String categoryName,
             boolean featured,
             long salesCount
+    ) {
+    }
+
+    public record ProductSummary(
+            Long productId, Long defaultSkuId, String productName, String imageUrl, BigDecimal salePrice
     ) {
     }
 }
