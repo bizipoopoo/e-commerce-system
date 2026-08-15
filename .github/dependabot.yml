@@ -3,6 +3,7 @@ version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
       day: monday
@@ -12,9 +13,13 @@ updates:
       actions-minor-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: maven
     directory: /backend
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
       day: monday
@@ -24,9 +29,13 @@ updates:
       maven-minor-patch:
         patterns: ["*"]
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /
+    open-pull-requests-limit: 5
     schedule:
       interval: weekly
       day: monday
@@ -36,23 +45,33 @@ updates:
       npm-minor-patch:
         patterns: ["*"]
         update-types: [minor, patch]
-
-  - package-ecosystem: docker
-    directory: /
-    schedule:
-      interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directory: /backend
+    open-pull-requests-limit: 3
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directory: /apps/storefront
+    open-pull-requests-limit: 3
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: docker
     directory: /apps/admin-web
+    open-pull-requests-limit: 3
     schedule:
       interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]

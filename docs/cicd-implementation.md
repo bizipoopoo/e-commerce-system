@@ -149,6 +149,7 @@ workflow 会拒绝不在 `origin/main` 历史中的版本标签，防止从未 R
 ## 9. 安全与供应链
 
 - Actions 仅使用当前官方主版本；Dependabot 自动创建升级 PR，由同一 CI 验证。
+- Dependabot 日常只提交 minor/patch；框架、JDK、Node 和 TypeScript major 升级按季度单独评估迁移，不混入例行依赖更新。
 - 发布 job 的 `packages: write` 是最小权限，普通 CI 只有 `contents: read`。
 - BuildKit 为镜像附带最大 provenance 和 SBOM；没有发布 `latest` 标签。
 - production Secrets 只绑定 production Environment，并通过审批后才可读取。

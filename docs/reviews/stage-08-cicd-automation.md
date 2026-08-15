@@ -30,6 +30,7 @@
 | P2 | 发布专用 Compose 只有通用 YAML 解析，缺少 Docker Compose 对变量和 schema 的真实展开校验 | 常规 Quality Gate 增加带占位 digest/Secrets 的 `docker compose -f deployment/compose.release.yml config --quiet` |
 | P2 | 部署失败自动回滚属于关键发布控制，初版仅能靠真实服务器验证 | 增加 fake-Docker 自动化测试，覆盖部署成功、健康失败、精确回滚、历史状态、非法标签/环境和可移动镜像引用拒绝 |
 | P2 | SSH 配置错误时可能尝试额外身份或等待交互式认证，失败反馈不够快 | 连接前验证全部 Environment Secrets 和端口范围；SSH/SCP 强制 `BatchMode`、`IdentitiesOnly` 与 15 秒连接超时 |
+| P2 | 首次推送后 Dependabot 立即创建 9 个 PR，其中包含 Spring Boot 4、Node 26、TypeScript 7 等 major 升级；根目录 Docker 扫描还产生失败运行 | 所有生态忽略 semver major 并设置 PR 上限；移除不兼容的根 Docker 扫描，major 升级改为季度迁移评估 |
 | P3 | macOS 默认没有 Linux `flock`，本地直接运行远端部署脚本会在锁阶段失败 | 测试显式模拟锁；实施手册明确目标 Linux 必须安装 `util-linux/flock`，该脚本不作为 macOS 部署入口 |
 
 ## 验证结果
