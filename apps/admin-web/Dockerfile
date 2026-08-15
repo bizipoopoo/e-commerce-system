@@ -7,7 +7,7 @@ RUN npm ci
 COPY apps/admin-web apps/admin-web
 RUN npm run build:admin
 
-FROM nginx:1.27-alpine
+FROM nginx:1.31-alpine
 COPY deployment/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /workspace/apps/admin-web/dist /usr/share/nginx/html
 EXPOSE 80
