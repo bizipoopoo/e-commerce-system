@@ -14,6 +14,7 @@ export interface CreateOrderInput {
   receiverPhone: string
   addressLine: string
   customerNote: string
+  userCouponId: number | null
 }
 
 export const useOrderStore = defineStore('orders', () => {

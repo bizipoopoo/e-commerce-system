@@ -75,11 +75,12 @@ class OrderController {
             @NotBlank @Size(max = 30)
             @Pattern(regexp = "^[0-9+() -]{6,30}$") String receiverPhone,
             @NotBlank @Size(max = 300) String addressLine,
-            @Size(max = 300) String customerNote
+            @Size(max = 300) String customerNote,
+            Long userCouponId
     ) {
         OrderFacade.CreateOrderCommand toCommand() {
             return new OrderFacade.CreateOrderCommand(
-                    receiverName, receiverPhone, addressLine, customerNote);
+                    receiverName, receiverPhone, addressLine, customerNote, userCouponId);
         }
     }
 }

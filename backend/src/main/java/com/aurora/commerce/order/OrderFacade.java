@@ -2,17 +2,21 @@ package com.aurora.commerce.order;
 
 import com.aurora.commerce.cart.CartFacade;
 import com.aurora.commerce.inventory.InventoryFacade;
+import com.aurora.commerce.marketing.MarketingFacade;
+import com.aurora.commerce.notification.NotificationFacade;
 import com.aurora.commerce.shared.error.BusinessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -28,6 +32,8 @@ public class OrderFacade {
     private final OrderStatusLogRepository logRepository;
     private final CartFacade cartFacade;
     private final InventoryFacade inventoryFacade;
+    private final MarketingFacade marketingFacade;
+    private final NotificationFacade notificationFacade;
     private final Clock clock = Clock.systemUTC();
 
     OrderFacade(
@@ -35,13 +41,17 @@ public class OrderFacade {
             OrderItemRepository itemRepository,
             OrderStatusLogRepository logRepository,
             CartFacade cartFacade,
-            InventoryFacade inventoryFacade
+            InventoryFacade inventoryFacade,
+            MarketingFacade marketingFacade,
+            NotificationFacade notificationFacade
     ) {
         this.orderRepository = orderRepository;
         this.itemRepository = itemRepository;
         this.logRepository = logRepository;
         this.cartFacade = cartFacade;
         this.inventoryFacade = inventoryFacade;
+        this.marketingFacade = marketingFacade;
+        this.notificationFacade = notificationFacade;
     }
 
     @Transactional
@@ -58,21 +68,25 @@ public class OrderFacade {
         Map<Long, Integer> quantities = cart.items().stream().collect(Collectors.toMap(
                 CartFacade.OrderCartLine::skuId, CartFacade.OrderCartLine::quantity, Integer::sum));
         inventoryFacade.reserve(reservationKey(orderNo), quantities);
+        MarketingFacade.DiscountView discount = marketingFacade.lockForOrder(
+                userId, command.userCouponId(), orderNo, cart.goodsAmount());
+        BigDecimal payableAmount = cart.goodsAmount().add(cart.shippingAmount())
+                .subtract(discount.discountAmount()).setScale(2, RoundingMode.HALF_UP);
 
         Instant now = clock.instant();
         CustomerOrder order = orderRepository.save(new CustomerOrder(
-                orderNo, userId, idempotencyKey, cart.goodsAmount(), cart.discountAmount(),
-                cart.shippingAmount(), cart.payableAmount(), command.receiverName(), command.receiverPhone(),
+                orderNo, userId, idempotencyKey, cart.goodsAmount(), discount.discountAmount(),
+                cart.shippingAmount(), payableAmount, command.receiverName(), command.receiverPhone(),
                 command.addressLine(), command.customerNote(), now.plusSeconds(30 * 60)
         ));
-        itemRepository.saveAll(cart.items().stream().map(item -> new OrderItem(
-                order.id(), item.productId(), item.skuId(), item.productName(), item.skuName(),
-                item.imageUrl(), item.unitPrice(), item.quantity(), item.subtotal()
-        )).toList());
+        itemRepository.saveAll(orderItems(order.id(), cart, discount.discountAmount()));
         logRepository.save(new OrderStatusLog(
                 order.id(), null, OrderStatus.PENDING_PAYMENT, "CUSTOMER", "提交订单", now));
         cartFacade.clearOrderedItems(
                 userId, cart.items().stream().map(CartFacade.OrderCartLine::cartItemId).toList());
+        notificationFacade.notifyUser(
+                userId, "ORDER", "订单已提交", "订单已创建，库存将为你保留 30 分钟。",
+                "ORDER", orderNo);
         return toView(order);
     }
 
@@ -109,7 +123,11 @@ public class OrderFacade {
         OrderStatus from = order.status();
         order.close(clock.instant());
         inventoryFacade.release(reservationKey(orderNo));
+        marketingFacade.release(orderNo);
         log(order, from, "CUSTOMER", "用户取消订单");
+        notificationFacade.notifyUser(
+                order.userId(), "ORDER", "订单已关闭", "订单已取消，锁定的库存和优惠券均已释放。",
+                "ORDER", orderNo);
         return toView(order);
     }
 
@@ -123,6 +141,9 @@ public class OrderFacade {
         OrderStatus from = order.status();
         order.complete(clock.instant());
         log(order, from, "CUSTOMER", "用户确认收货");
+        notificationFacade.notifyUser(
+                order.userId(), "FULFILLMENT", "订单已完成", "感谢确认收货，愿这件好物长久陪伴你。",
+                "ORDER", orderNo);
         return toView(order);
     }
 
@@ -151,8 +172,12 @@ public class OrderFacade {
         }
         OrderStatus from = order.status();
         inventoryFacade.confirm(reservationKey(orderNo));
+        marketingFacade.confirm(orderNo);
         order.markPaid(clock.instant());
         log(order, from, "PAYMENT", "模拟支付成功");
+        notificationFacade.notifyUser(
+                order.userId(), "PAYMENT", "支付成功", "订单支付成功，商家将尽快为你发货。",
+                "ORDER", orderNo);
         return toView(order);
     }
 
@@ -165,6 +190,9 @@ public class OrderFacade {
         OrderStatus from = order.status();
         order.ship(clock.instant());
         log(order, from, "ADMIN", remark);
+        notificationFacade.notifyUser(
+                order.userId(), "FULFILLMENT", "订单已发货", "你的包裹已经出发，可在订单中查看物流轨迹。",
+                "ORDER", orderNo);
         return toView(order);
     }
 
@@ -180,7 +208,11 @@ public class OrderFacade {
             }
             order.close(cutoff);
             inventoryFacade.release(reservationKey(order.orderNo()));
+            marketingFacade.release(order.orderNo());
             log(order, OrderStatus.PENDING_PAYMENT, "SYSTEM", "支付超时自动关闭");
+            notificationFacade.notifyUser(
+                    order.userId(), "ORDER", "订单超时关闭", "订单因超时未支付已自动关闭。",
+                    "ORDER", order.orderNo());
             expired++;
         }
         return expired;
@@ -189,6 +221,27 @@ public class OrderFacade {
     private void log(CustomerOrder order, OrderStatus from, String operator, String remark) {
         logRepository.save(new OrderStatusLog(
                 order.id(), from, order.status(), operator, remark, clock.instant()));
+    }
+
+    private List<OrderItem> orderItems(
+            Long orderId, CartFacade.OrderCart cart, BigDecimal totalDiscount
+    ) {
+        List<OrderItem> result = new ArrayList<>();
+        BigDecimal allocated = BigDecimal.ZERO.setScale(2);
+        for (int index = 0; index < cart.items().size(); index++) {
+            CartFacade.OrderCartLine line = cart.items().get(index);
+            BigDecimal lineDiscount = index == cart.items().size() - 1
+                    ? totalDiscount.subtract(allocated)
+                    : line.subtotal().multiply(totalDiscount)
+                            .divide(cart.goodsAmount(), 2, RoundingMode.DOWN);
+            allocated = allocated.add(lineDiscount);
+            result.add(new OrderItem(
+                    orderId, line.productId(), line.skuId(), line.productName(), line.skuName(),
+                    line.imageUrl(), line.unitPrice(), line.quantity(), lineDiscount,
+                    line.subtotal().subtract(lineDiscount).setScale(2, RoundingMode.HALF_UP)
+            ));
+        }
+        return result;
     }
 
     private OrderView toView(CustomerOrder order) {
@@ -254,7 +307,8 @@ public class OrderFacade {
             String receiverName,
             String receiverPhone,
             String addressLine,
-            String customerNote
+            String customerNote,
+            Long userCouponId
     ) {
     }
 

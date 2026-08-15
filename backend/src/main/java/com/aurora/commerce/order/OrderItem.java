@@ -52,7 +52,8 @@ class OrderItem {
 
     OrderItem(
             Long orderId, Long productId, Long skuId, String productName, String skuName,
-            String imageUrl, BigDecimal unitPrice, int quantity, BigDecimal payableAmount
+            String imageUrl, BigDecimal unitPrice, int quantity,
+            BigDecimal discountAmount, BigDecimal payableAmount
     ) {
         this.orderId = orderId;
         this.productId = productId;
@@ -62,7 +63,7 @@ class OrderItem {
         this.imageUrl = imageUrl;
         this.unitPrice = unitPrice;
         this.quantity = quantity;
-        this.discountAmount = BigDecimal.ZERO.setScale(2);
+        this.discountAmount = discountAmount;
         this.payableAmount = payableAmount;
     }
 

@@ -2,12 +2,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { ApiError, getHome, type Category, type ProductCard } from './api'
 import { useCartStore } from './cart'
+import { useDiscoverStore } from './discover'
 import { useOrderStore } from './orders'
 import { useSessionStore } from './session'
 
 const session = useSessionStore()
 const cart = useCartStore()
 const orders = useOrderStore()
+const discover = useDiscoverStore()
 const categories = ref<Array<Category & { caption: string }>>([])
 const products = ref<Array<ProductCard & { tag: string }>>([])
 const heroImage = ref('')
@@ -26,8 +28,19 @@ const receiverName = ref('')
 const receiverPhone = ref('')
 const addressLine = ref('')
 const customerNote = ref('')
+const selectedCouponId = ref<number | null>(null)
 
 const authTitle = computed(() => authMode.value === 'login' ? '欢迎回来' : '加入 Aurora')
+const selectedCoupon = computed(() => discover.myCoupons.find(
+  coupon => coupon.userCouponId === selectedCouponId.value && coupon.status === 'AVAILABLE',
+))
+const checkoutDiscount = computed(() => {
+  if (!selectedCoupon.value || !cart.checkout) return 0
+  return cart.checkout.goodsAmount >= selectedCoupon.value.thresholdAmount
+    ? selectedCoupon.value.discountAmount
+    : 0
+})
+const checkoutPayable = computed(() => Math.max(0, (cart.checkout?.payableAmount ?? 0) - checkoutDiscount.value))
 
 const tags = ['设计师精选', '本周热销', '新品首发', '会员专享']
 
@@ -65,6 +78,7 @@ function logout() {
   session.logout()
   cart.reset()
   orders.reset()
+  discover.reset()
   accountMenuOpen.value = false
 }
 
@@ -80,6 +94,8 @@ async function submitAuth() {
     authOpen.value = false
     password.value = ''
     void cart.load().catch(() => undefined)
+    discover.connectNotifications()
+    void discover.loadNotifications().catch(() => undefined)
   } catch (error) {
     authError.value = error instanceof ApiError
       ? error.message
@@ -96,7 +112,7 @@ function switchAuthMode() {
   authError.value = ''
 }
 
-async function addToCart(skuId: number | null) {
+async function addToCart(skuId: number | null, productId?: number) {
   if (!session.authenticated) {
     authOpen.value = true
     return
@@ -104,6 +120,7 @@ async function addToCart(skuId: number | null) {
   if (skuId == null) return
   try {
     await cart.add(skuId)
+    if (productId != null) void discover.record('ADD_TO_CART', productId)
   } catch {
     cart.drawerOpen = true
   }
@@ -150,6 +167,8 @@ async function removeCartItem(itemId: number) {
 
 async function previewCheckout() {
   if (cart.checkout) {
+    selectedCouponId.value = null
+    await discover.loadCoupons().catch(() => undefined)
     orders.beginCheckout()
     cart.drawerOpen = false
     return
@@ -168,11 +187,53 @@ async function submitOrder() {
       receiverPhone: receiverPhone.value,
       addressLine: addressLine.value,
       customerNote: customerNote.value,
+      userCouponId: selectedCouponId.value,
     })
     await cart.load()
   } catch {
     // The checkout dialog presents the actionable error.
   }
+}
+
+async function openDiscover() {
+  discover.discoverOpen = true
+  try {
+    await discover.loadDiscover()
+  } catch {
+    // The discovery panel presents the actionable error.
+  }
+}
+
+async function openMessages() {
+  if (!session.authenticated) {
+    authOpen.value = true
+    return
+  }
+  discover.messagesOpen = true
+  discover.connectNotifications()
+  try {
+    await discover.loadNotifications()
+  } catch {
+    // The message center presents the actionable error.
+  }
+}
+
+async function claimCoupon(couponId: number) {
+  if (!session.authenticated) {
+    discover.discoverOpen = false
+    authOpen.value = true
+    return
+  }
+  try {
+    await discover.claim(couponId)
+  } catch {
+    // The discovery panel presents the actionable error.
+  }
+}
+
+async function addRecommendation(skuId: number, productId: number) {
+  await discover.record('CLICK', productId)
+  await addToCart(skuId, productId)
 }
 
 async function mockPay() {
@@ -229,7 +290,13 @@ function formatTime(value: string | null) {
 
 onMounted(() => {
   void loadHome()
-  void session.restore().then(() => cart.load()).catch(() => undefined)
+  void session.restore().then(async () => {
+    await cart.load()
+    if (session.authenticated) {
+      discover.connectNotifications()
+      await discover.loadNotifications()
+    }
+  }).catch(() => undefined)
 })
 
 const stories = [
@@ -249,11 +316,12 @@ const stories = [
         <a class="active" href="#">首页</a>
         <a href="#new">新品</a>
         <a href="#selection">精选</a>
-        <a href="#inspiration">灵感</a>
+        <a href="#inspiration" @click.prevent="openDiscover">发现</a>
         <a href="#member">会员</a>
       </nav>
       <div class="header-actions">
         <button aria-label="搜索">⌕</button>
+        <button class="message-button" aria-label="消息中心" @click="openMessages">✦<b v-if="discover.unreadCount">{{ discover.unreadCount }}</b></button>
         <button class="account-button" aria-label="个人中心" @click="openAccount">
           {{ session.user?.displayName || '登录' }}
         </button>
@@ -318,7 +386,7 @@ const stories = [
               <img :src="product.coverImageUrl" :alt="product.name" />
               <span class="product-tag">{{ product.tag }}</span>
               <button class="favorite" aria-label="收藏">♡</button>
-              <button class="quick-add" :disabled="product.defaultSkuId == null" @click="addToCart(product.defaultSkuId)">快速加入购物袋</button>
+              <button class="quick-add" :disabled="product.defaultSkuId == null" @click="addToCart(product.defaultSkuId, product.id)">快速加入购物袋</button>
             </div>
             <p>{{ product.brandName }}</p>
             <h3>{{ product.name }}</h3>
@@ -432,8 +500,17 @@ const stories = [
         </div>
         <label>详细地址<input v-model.trim="addressLine" required maxlength="300" placeholder="省 / 市 / 区 / 街道及门牌号" /></label>
         <label>订单备注<input v-model.trim="customerNote" maxlength="300" placeholder="选填，例如工作日配送" /></label>
+        <label v-if="discover.myCoupons.length">使用优惠券
+          <select v-model="selectedCouponId">
+            <option :value="null">不使用优惠券</option>
+            <option v-for="coupon in discover.myCoupons.filter(item => item.status === 'AVAILABLE')" :key="coupon.userCouponId!" :value="coupon.userCouponId">
+              {{ coupon.name }} · 满 ¥{{ coupon.thresholdAmount }} 减 ¥{{ coupon.discountAmount }}
+            </option>
+          </select>
+        </label>
+        <div v-if="selectedCoupon && checkoutDiscount === 0" class="coupon-hint">当前商品金额未达到该优惠券使用门槛</div>
         <div class="checkout-order-total">
-          <span>本次应付</span><strong>¥{{ cart.checkout?.payableAmount.toLocaleString() }}</strong>
+          <span>本次应付 <small v-if="checkoutDiscount">已优惠 ¥{{ checkoutDiscount }}</small></span><strong>¥{{ checkoutPayable.toLocaleString() }}</strong>
         </div>
         <div v-if="orders.error" class="auth-error">{{ orders.error }}</div>
         <button class="auth-submit" :disabled="orders.loading">{{ orders.loading ? '正在锁定库存…' : '提交订单并前往支付' }}</button>
@@ -494,6 +571,59 @@ const stories = [
               <button v-if="orders.active.status === 'SHIPPED'" @click="confirmOrder(orders.active.orderNo)">确认收货</button>
             </div>
           </section>
+        </div>
+      </aside>
+    </div>
+
+    <div v-if="discover.discoverOpen" class="discovery-overlay" @click.self="discover.discoverOpen = false">
+      <section class="discovery-panel" aria-label="发现频道">
+        <header>
+          <div><p class="eyebrow">DISCOVER A BETTER EVERYDAY</p><h2>今天，发现什么？</h2><span>基于真实行为与全站热度，为你解释每一次推荐。</span></div>
+          <button aria-label="关闭发现" @click="discover.discoverOpen = false">×</button>
+        </header>
+        <div v-if="discover.error" class="cart-error">{{ discover.error }}</div>
+        <div class="discovery-scroll">
+          <section class="coupon-zone">
+            <div class="discovery-heading"><div><p class="eyebrow">MEMBER BENEFITS</p><h3>会员礼遇</h3></div><span>领取后可在结算时直接抵扣</span></div>
+            <div class="coupon-row">
+              <article v-for="coupon in discover.coupons" :key="coupon.couponId" :class="{ claimed: coupon.status !== 'UNCLAIMED' }">
+                <strong>¥{{ coupon.discountAmount }}</strong><div><b>{{ coupon.name }}</b><span>满 ¥{{ coupon.thresholdAmount }} 可用</span><small>{{ coupon.description }}</small></div>
+                <button :disabled="coupon.status !== 'UNCLAIMED' || discover.loading" @click="claimCoupon(coupon.couponId)">{{ coupon.status === 'UNCLAIMED' ? '立即领取' : '已领取' }}</button>
+              </article>
+            </div>
+          </section>
+          <section class="recommend-zone">
+            <div class="discovery-heading"><div><p class="eyebrow">CURATED FOR YOU</p><h3>为你推荐</h3></div><span>推荐理由清晰可见</span></div>
+            <div class="recommend-grid">
+              <article v-for="item in discover.recommendations" :key="item.productId">
+                <img :src="item.imageUrl" :alt="item.productName" /><div><span>{{ item.reason }}</span><h4>{{ item.productName }}</h4><p>{{ item.categoryName }}</p><strong>¥{{ item.salePrice.toLocaleString() }}</strong><button @click="addRecommendation(item.defaultSkuId, item.productId)">加入购物袋</button></div>
+              </article>
+            </div>
+          </section>
+          <section class="article-zone">
+            <div class="discovery-heading"><div><p class="eyebrow">JOURNAL</p><h3>生活提案</h3></div><span>来自 Aurora 编辑部</span></div>
+            <div class="article-grid">
+              <article v-for="article in discover.articles" :key="article.id" @click="discover.activeArticle = article">
+                <img :src="article.coverImageUrl" :alt="article.title" /><span>{{ article.channelCode }}</span><h4>{{ article.title }}</h4><p>{{ article.summary }}</p><button>阅读提案 →</button>
+              </article>
+            </div>
+          </section>
+        </div>
+      </section>
+      <article v-if="discover.activeArticle" class="article-reader" @click.stop>
+        <button aria-label="关闭文章" @click="discover.activeArticle = null">×</button><img :src="discover.activeArticle.coverImageUrl" :alt="discover.activeArticle.title" /><div><span>{{ discover.activeArticle.channelCode }}</span><h2>{{ discover.activeArticle.title }}</h2><p>{{ discover.activeArticle.contentText }}</p></div>
+      </article>
+    </div>
+
+    <div v-if="discover.messagesOpen" class="cart-overlay message-overlay" @click.self="discover.messagesOpen = false">
+      <aside class="message-drawer" aria-label="消息中心">
+        <header><div><p class="eyebrow">AURORA UPDATES</p><h2>消息中心 <span>{{ discover.unreadCount }} 未读</span></h2></div><button aria-label="关闭消息" @click="discover.messagesOpen = false">×</button></header>
+        <div v-if="discover.error" class="cart-error">{{ discover.error }}</div>
+        <div v-if="!discover.notifications.length" class="empty-cart"><strong>暂时没有新消息</strong><p>订单、物流和会员礼遇会在这里及时送达。</p></div>
+        <div v-else class="message-list">
+          <article v-for="item in discover.notifications" :key="item.id" :class="{ unread: !item.readAt }" @click="discover.markRead(item)">
+            <i>{{ item.type === 'MARKETING' ? '礼' : item.type === 'PAYMENT' ? '¥' : '物' }}</i><div><span>{{ item.type }}</span><h3>{{ item.title }}</h3><p>{{ item.content }}</p><small>{{ formatTime(item.createdAt) }}</small></div><b v-if="!item.readAt"></b>
+          </article>
         </div>
       </aside>
     </div>

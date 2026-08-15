@@ -162,6 +162,58 @@ export interface Shipment {
   tracks: Array<{ description: string; occurredAt: string }>
 }
 
+export interface Coupon {
+  couponId: number
+  userCouponId: number | null
+  code: string
+  name: string
+  description: string
+  discountAmount: number
+  thresholdAmount: number
+  status: 'UNCLAIMED' | 'AVAILABLE' | 'LOCKED' | 'USED' | 'EXPIRED'
+  startsAt: string
+  endsAt: string
+}
+
+export interface ContentArticle {
+  id: number
+  slug: string
+  title: string
+  summary: string
+  coverImageUrl: string
+  contentText: string
+  channelCode: string
+  featured: boolean
+  publishedAt: string
+}
+
+export interface Recommendation {
+  productId: number
+  defaultSkuId: number
+  productName: string
+  subtitle: string
+  imageUrl: string
+  salePrice: number
+  categoryName: string
+  reason: string
+}
+
+export interface NotificationItem {
+  id: number
+  type: string
+  title: string
+  content: string
+  referenceType: string | null
+  referenceNo: string | null
+  readAt: string | null
+  createdAt: string
+}
+
+export interface NotificationCenter {
+  items: NotificationItem[]
+  unreadCount: number
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly code: string,

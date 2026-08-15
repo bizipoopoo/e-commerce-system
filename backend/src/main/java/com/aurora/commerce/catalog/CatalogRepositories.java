@@ -31,6 +31,8 @@ interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findTop8ByStatusAndFeaturedTrueOrderBySalesCountDesc(ProductStatus status);
 
     List<Product> findTop8ByStatusOrderByCreatedAtDesc(ProductStatus status);
+
+    List<Product> findTop20ByStatusOrderBySalesCountDesc(ProductStatus status);
 }
 
 interface ProductSkuRepository extends JpaRepository<ProductSku, Long> {
