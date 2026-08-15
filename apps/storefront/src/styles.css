@@ -163,6 +163,65 @@ footer { padding: 52px 0; background: #142c21; color: white; }
 .checkout-button { width: 100%; height: 45px; margin-top: 15px; border: 0; background: var(--green); color: white; cursor: pointer; font-size: 11px; letter-spacing: .08em; }
 .checkout-button:disabled { opacity: .5; cursor: not-allowed; }
 .cart-drawer > footer small { display: block; margin-top: 10px; color: #909791; text-align: center; font-size: 8px; }
+.trade-overlay { z-index: 50; }
+.checkout-dialog { width: 540px; }
+.checkout-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.checkout-order-total { display: flex; justify-content: space-between; align-items: center; margin: 24px 0 6px; padding: 16px 0; border-top: 1px solid #dedbd3; color: #667169; font-size: 11px; }
+.checkout-order-total strong { color: var(--orange); font-family: 'Noto Serif SC', serif; font-size: 24px; }
+.payment-dialog { width: 500px; }
+.payment-amount { display: flex; justify-content: space-between; align-items: center; margin: 26px 0; padding: 20px 0; border-block: 1px solid #dfddd5; color: #6d7770; font-size: 11px; }
+.payment-amount strong { color: var(--orange); font-family: 'Noto Serif SC', serif; font-size: 29px; }
+.mock-channel { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 15px; border: 1px solid #31533f; background: #f1f4ef; }
+.mock-channel > i { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--green); color: white; font-style: normal; }
+.mock-channel div { display: grid; gap: 3px; }
+.mock-channel div strong { font-size: 11px; }
+.mock-channel div span { color: #879088; font-size: 8px; }
+.mock-channel > b { color: var(--green); font-size: 9px; }
+.payment-success { padding-top: 15px; text-align: center; }
+.payment-success > i { display: grid; place-items: center; width: 58px; height: 58px; margin: 0 auto 22px; border-radius: 50%; background: var(--green); color: white; font-size: 27px; font-style: normal; }
+.payment-success > p { margin: 12px auto 25px !important; }
+.order-overlay { z-index: 35; }
+.order-drawer { position: absolute; right: 0; top: 0; bottom: 0; width: min(900px, 76vw); display: flex; flex-direction: column; background: #f8f6f0; box-shadow: -24px 0 70px rgba(12,31,21,.2); }
+.order-drawer > header { min-height: 94px; display: flex; justify-content: space-between; align-items: center; padding: 22px 30px; border-bottom: 1px solid #dedcd5; }
+.order-drawer > header p { margin: 0 0 5px; }
+.order-drawer > header h2 { margin: 0; font-family: 'Noto Serif SC', serif; font-size: 25px; font-weight: 500; }
+.order-drawer > header button { border: 0; background: transparent; color: #7d8781; cursor: pointer; font-size: 26px; }
+.order-workspace { min-height: 0; flex: 1; display: grid; grid-template-columns: 310px 1fr; }
+.order-list { overflow-y: auto; padding: 16px; border-right: 1px solid #dedcd5; background: #f1eee6; }
+.order-list > button { width: 100%; display: grid; gap: 9px; margin-bottom: 10px; padding: 16px; border: 1px solid transparent; background: #faf8f2; color: #27362e; text-align: left; cursor: pointer; }
+.order-list > button.active { border-color: #416550; box-shadow: 0 8px 24px rgba(27,62,43,.08); }
+.order-list > button span { display: flex; justify-content: space-between; color: #929993; font-size: 8px; }
+.order-list > button span b { color: var(--orange); font-size: 9px; }
+.order-list > button strong { font-family: 'Noto Serif SC', serif; font-size: 12px; font-weight: 500; }
+.order-list > button strong small { margin-left: 5px; color: #8b938e; font-family: 'DM Sans'; font-size: 8px; }
+.order-list > button em { color: #293a30; font-size: 13px; font-style: normal; font-weight: 600; }
+.empty-orders { display: grid; gap: 8px; padding: 45px 16px; color: #929993; text-align: center; font-size: 9px; }
+.empty-orders strong { color: #35463c; font-family: 'Noto Serif SC', serif; font-size: 15px; }
+.order-detail { overflow-y: auto; padding: 26px 32px 38px; }
+.order-detail-head { display: flex; justify-content: space-between; margin-bottom: 18px; color: #8b938e; font-size: 9px; }
+.order-detail-head b { color: var(--orange); font-size: 11px; }
+.order-detail > article { display: grid; grid-template-columns: 70px 1fr auto; gap: 13px; align-items: center; padding: 13px 0; border-bottom: 1px solid #e0ded7; }
+.order-detail > article img { width: 70px; height: 78px; object-fit: cover; }
+.order-detail > article div { display: grid; gap: 7px; }
+.order-detail > article div strong { font-family: 'Noto Serif SC', serif; font-size: 12px; font-weight: 500; }
+.order-detail > article div span { color: #909791; font-size: 8px; }
+.order-detail > article > b { color: #4a564e; font-size: 11px; }
+.order-address, .shipment-card { margin-top: 20px; padding: 16px; background: #eeece5; }
+.order-address > span, .shipment-card > span { display: block; margin-bottom: 8px; color: #9a6b4a; font-size: 8px; letter-spacing: .12em; }
+.order-address strong { font-size: 10px; }
+.order-address p { margin: 6px 0 0; color: #788079; font-size: 9px; }
+.shipment-card p { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 3px; margin: 12px 0 0; padding-left: 17px; font-size: 9px; }
+.shipment-card p i { position: absolute; left: 0; top: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.shipment-card p small { color: #959c96; font-size: 7px; }
+.order-timeline { margin: 22px 0; border-left: 1px solid #cfd3cf; }
+.order-timeline p { position: relative; display: grid; grid-template-columns: 1fr auto; gap: 3px; margin: 0; padding: 0 0 18px 20px; }
+.order-timeline p i { position: absolute; left: -4px; top: 2px; width: 7px; height: 7px; border: 2px solid #f8f6f0; border-radius: 50%; background: #587360; }
+.order-timeline p span { display: grid; gap: 3px; color: #7b847e; font-size: 8px; }
+.order-timeline p span b { color: #34463b; font-size: 10px; }
+.order-timeline p small { color: #959c96; font-size: 7px; }
+.order-actions { display: flex; gap: 10px; }
+.order-actions button { padding: 11px 22px; border: 1px solid var(--green); background: var(--green); color: white; cursor: pointer; font-size: 9px; }
+.order-actions button.secondary { background: transparent; color: var(--green); }
 @keyframes shimmer { to { background-position-x: -200%; } }
 
 @media (max-width: 1240px) {

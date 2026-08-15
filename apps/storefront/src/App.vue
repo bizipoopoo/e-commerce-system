@@ -2,10 +2,12 @@
 import { computed, onMounted, ref } from 'vue'
 import { ApiError, getHome, type Category, type ProductCard } from './api'
 import { useCartStore } from './cart'
+import { useOrderStore } from './orders'
 import { useSessionStore } from './session'
 
 const session = useSessionStore()
 const cart = useCartStore()
+const orders = useOrderStore()
 const categories = ref<Array<Category & { caption: string }>>([])
 const products = ref<Array<ProductCard & { tag: string }>>([])
 const heroImage = ref('')
@@ -20,6 +22,10 @@ const displayName = ref('')
 const authError = ref('')
 const authSubmitting = ref(false)
 const accountMenuOpen = ref(false)
+const receiverName = ref('')
+const receiverPhone = ref('')
+const addressLine = ref('')
+const customerNote = ref('')
 
 const authTitle = computed(() => authMode.value === 'login' ? '欢迎回来' : '加入 Aurora')
 
@@ -58,6 +64,7 @@ function openAccount() {
 function logout() {
   session.logout()
   cart.reset()
+  orders.reset()
   accountMenuOpen.value = false
 }
 
@@ -142,11 +149,82 @@ async function removeCartItem(itemId: number) {
 }
 
 async function previewCheckout() {
+  if (cart.checkout) {
+    orders.beginCheckout()
+    cart.drawerOpen = false
+    return
+  }
   try {
     await cart.previewCheckout()
   } catch {
     // The cart drawer presents the actionable error.
   }
+}
+
+async function submitOrder() {
+  try {
+    await orders.create({
+      receiverName: receiverName.value,
+      receiverPhone: receiverPhone.value,
+      addressLine: addressLine.value,
+      customerNote: customerNote.value,
+    })
+    await cart.load()
+  } catch {
+    // The checkout dialog presents the actionable error.
+  }
+}
+
+async function mockPay() {
+  try {
+    await orders.pay()
+  } catch {
+    // The payment dialog presents the actionable error.
+  }
+}
+
+async function openOrders() {
+  accountMenuOpen.value = false
+  orders.drawerOpen = true
+  try {
+    await orders.load()
+  } catch {
+    // The order drawer presents the actionable error.
+  }
+}
+
+async function selectOrder(order: (typeof orders.data)[number]) {
+  try {
+    await orders.select(order)
+  } catch {
+    // The order drawer presents the actionable error.
+  }
+}
+
+async function cancelOrder(orderNo: string) {
+  try {
+    await orders.cancel(orderNo)
+  } catch {
+    // The order drawer presents the actionable error.
+  }
+}
+
+async function confirmOrder(orderNo: string) {
+  try {
+    await orders.confirmReceipt(orderNo)
+  } catch {
+    // The order drawer presents the actionable error.
+  }
+}
+
+function orderStatus(status: string) {
+  return ({
+    PENDING_PAYMENT: '待支付', PAID: '待发货', SHIPPED: '运输中', COMPLETED: '已完成', CLOSED: '已关闭',
+  } as Record<string, string>)[status] ?? status
+}
+
+function formatTime(value: string | null) {
+  return value ? new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : ''
 }
 
 onMounted(() => {
@@ -182,6 +260,7 @@ const stories = [
         <div v-if="accountMenuOpen && session.user" class="account-menu">
           <strong>{{ session.user.displayName }}</strong>
           <span>{{ session.user.email }}</span>
+          <button @click="openOrders">我的订单</button>
           <button @click="logout">退出登录</button>
         </div>
         <button class="cart" aria-label="购物车" @click="openCart">购物袋 <b>{{ cart.data.totalQuantity }}</b></button>
@@ -334,10 +413,88 @@ const stories = [
             <p><span>应付金额</span><strong>¥{{ cart.checkout.payableAmount.toLocaleString() }}</strong></p>
           </div>
           <button class="checkout-button" :disabled="cart.loading || cart.data.selectedQuantity === 0" @click="previewCheckout">
-            {{ cart.loading ? '正在计算…' : cart.checkout ? '确认结算信息' : '结算预览' }}
+            {{ cart.loading ? '正在计算…' : cart.checkout ? '填写配送信息' : '结算预览' }}
           </button>
-          <small>满 ¥299 免运费 · 当前阶段仅生成结算预览</small>
+          <small>满 ¥299 免运费 · 下单后 30 分钟内完成支付</small>
         </footer>
+      </aside>
+    </div>
+
+    <div v-if="orders.checkoutOpen" class="auth-overlay trade-overlay" @click.self="orders.checkoutOpen = false">
+      <form class="auth-dialog checkout-dialog" role="dialog" aria-modal="true" aria-label="确认订单" @submit.prevent="submitOrder">
+        <button class="auth-close" type="button" aria-label="关闭结算" @click="orders.checkoutOpen = false">×</button>
+        <p class="eyebrow">SECURE CHECKOUT</p>
+        <h2>确认配送信息</h2>
+        <p>价格和库存会在提交时再次校验，订单创建后将为你锁定 30 分钟。</p>
+        <div class="checkout-form-grid">
+          <label>收货人<input v-model.trim="receiverName" required maxlength="80" placeholder="收货人姓名" /></label>
+          <label>联系电话<input v-model.trim="receiverPhone" required maxlength="30" pattern="[0-9+() -]{6,30}" placeholder="138 0000 0000" /></label>
+        </div>
+        <label>详细地址<input v-model.trim="addressLine" required maxlength="300" placeholder="省 / 市 / 区 / 街道及门牌号" /></label>
+        <label>订单备注<input v-model.trim="customerNote" maxlength="300" placeholder="选填，例如工作日配送" /></label>
+        <div class="checkout-order-total">
+          <span>本次应付</span><strong>¥{{ cart.checkout?.payableAmount.toLocaleString() }}</strong>
+        </div>
+        <div v-if="orders.error" class="auth-error">{{ orders.error }}</div>
+        <button class="auth-submit" :disabled="orders.loading">{{ orders.loading ? '正在锁定库存…' : '提交订单并前往支付' }}</button>
+      </form>
+    </div>
+
+    <div v-if="orders.paymentOpen && orders.active" class="auth-overlay trade-overlay" @click.self="orders.paymentOpen = false">
+      <section class="auth-dialog payment-dialog" role="dialog" aria-modal="true" aria-label="模拟收银台">
+        <button class="auth-close" type="button" aria-label="关闭收银台" @click="orders.paymentOpen = false">×</button>
+        <p class="eyebrow">AURORA PAY</p>
+        <div v-if="orders.active.status === 'PENDING_PAYMENT'">
+          <h2>订单已为你保留</h2>
+          <p>订单 {{ orders.active.orderNo }}<br />请在 {{ formatTime(orders.active.expireAt) }} 前完成支付。</p>
+          <div class="payment-amount"><span>支付金额</span><strong>¥{{ orders.active.payableAmount.toLocaleString() }}</strong></div>
+          <div class="mock-channel"><i>◆</i><div><strong>Aurora 模拟支付</strong><span>用于 Demo 演示，不会产生真实扣款</span></div><b>已选择</b></div>
+          <div v-if="orders.error" class="auth-error">{{ orders.error }}</div>
+          <button class="auth-submit" :disabled="orders.loading" @click="mockPay">{{ orders.loading ? '支付处理中…' : '确认模拟支付' }}</button>
+        </div>
+        <div v-else class="payment-success">
+          <i>✓</i><h2>支付成功</h2><p>库存已正式扣减，订单正在等待商家发货。</p>
+          <button class="auth-submit" @click="orders.paymentOpen = false; openOrders()">查看我的订单</button>
+        </div>
+      </section>
+    </div>
+
+    <div v-if="orders.drawerOpen" class="cart-overlay order-overlay" @click.self="orders.drawerOpen = false">
+      <aside class="order-drawer" aria-label="我的订单">
+        <header>
+          <div><p class="eyebrow">MY AURORA</p><h2>我的订单</h2></div>
+          <button aria-label="关闭订单" @click="orders.drawerOpen = false">×</button>
+        </header>
+        <div v-if="orders.error" class="cart-error">{{ orders.error }}</div>
+        <div class="order-workspace">
+          <div class="order-list">
+            <div v-if="!orders.data.length" class="empty-orders"><strong>还没有订单</strong><span>从一件喜欢的商品开始吧。</span></div>
+            <button v-for="order in orders.data" :key="order.orderNo" :class="{ active: orders.active?.orderNo === order.orderNo }" @click="selectOrder(order)">
+              <span><b>{{ orderStatus(order.status) }}</b>{{ formatTime(order.createdAt) }}</span>
+              <strong>{{ order.items[0]?.productName }}<small v-if="order.items.length > 1">等 {{ order.items.length }} 件</small></strong>
+              <em>¥{{ order.payableAmount.toLocaleString() }}</em>
+            </button>
+          </div>
+          <section v-if="orders.active" class="order-detail">
+            <div class="order-detail-head"><span>订单 {{ orders.active.orderNo }}</span><b>{{ orderStatus(orders.active.status) }}</b></div>
+            <article v-for="item in orders.active.items" :key="item.id">
+              <img :src="item.imageUrl" :alt="item.productName" /><div><strong>{{ item.productName }}</strong><span>{{ item.skuName }} · ×{{ item.quantity }}</span></div><b>¥{{ item.payableAmount.toLocaleString() }}</b>
+            </article>
+            <div class="order-address"><span>配送至</span><strong>{{ orders.active.receiverName }} · {{ orders.active.receiverPhone }}</strong><p>{{ orders.active.addressLine }}</p></div>
+            <div v-if="orders.shipment" class="shipment-card">
+              <span>{{ orders.shipment.carrier }} · {{ orders.shipment.trackingNo }}</span>
+              <p v-for="track in orders.shipment.tracks" :key="track.occurredAt"><i></i><b>{{ track.description }}</b><small>{{ formatTime(track.occurredAt) }}</small></p>
+            </div>
+            <div class="order-timeline">
+              <p v-for="log in orders.active.timeline" :key="log.createdAt"><i></i><span><b>{{ orderStatus(log.toStatus) }}</b>{{ log.remark }}</span><small>{{ formatTime(log.createdAt) }}</small></p>
+            </div>
+            <div class="order-actions">
+              <button v-if="orders.active.status === 'PENDING_PAYMENT'" @click="orders.paymentOpen = true">立即支付</button>
+              <button v-if="orders.active.status === 'PENDING_PAYMENT'" class="secondary" @click="cancelOrder(orders.active.orderNo)">取消订单</button>
+              <button v-if="orders.active.status === 'SHIPPED'" @click="confirmOrder(orders.active.orderNo)">确认收货</button>
+            </div>
+          </section>
+        </div>
       </aside>
     </div>
   </div>

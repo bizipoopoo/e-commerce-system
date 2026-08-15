@@ -96,6 +96,72 @@ export interface CheckoutPreview {
   payableAmount: number
 }
 
+export type OrderStatus = 'PENDING_PAYMENT' | 'PAID' | 'SHIPPED' | 'COMPLETED' | 'CLOSED'
+
+export interface OrderItem {
+  id: number
+  productId: number
+  skuId: number
+  productName: string
+  skuName: string
+  imageUrl: string
+  unitPrice: number
+  quantity: number
+  discountAmount: number
+  payableAmount: number
+}
+
+export interface OrderTimeline {
+  fromStatus: OrderStatus | null
+  toStatus: OrderStatus
+  operatorType: string
+  remark: string
+  createdAt: string
+}
+
+export interface CustomerOrder {
+  orderNo: string
+  status: OrderStatus
+  items: OrderItem[]
+  goodsAmount: number
+  discountAmount: number
+  shippingAmount: number
+  payableAmount: number
+  receiverName: string
+  receiverPhone: string
+  addressLine: string
+  customerNote: string | null
+  expireAt: string
+  paidAt: string | null
+  shippedAt: string | null
+  completedAt: string | null
+  closedAt: string | null
+  createdAt: string
+  timeline: OrderTimeline[]
+}
+
+export interface PaymentOrder {
+  paymentNo: string
+  orderNo: string
+  status: 'PENDING' | 'SUCCESS'
+  channel: string
+  amount: number
+  providerTradeNo: string | null
+  paidAt: string | null
+  createdAt: string
+}
+
+export interface Shipment {
+  shipmentNo: string
+  orderNo: string
+  status: 'IN_TRANSIT' | 'DELIVERED'
+  carrier: string
+  trackingNo: string
+  shippedAt: string
+  deliveredAt: string | null
+  tracks: Array<{ description: string; occurredAt: string }>
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly code: string,

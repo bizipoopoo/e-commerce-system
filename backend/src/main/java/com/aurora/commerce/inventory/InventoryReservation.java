@@ -17,7 +17,8 @@ class InventoryReservation {
 
     enum Status {
         ACTIVE,
-        RELEASED
+        RELEASED,
+        CONFIRMED
     }
 
     @Id
@@ -43,6 +44,9 @@ class InventoryReservation {
     @Column(name = "released_at")
     private Instant releasedAt;
 
+    @Column(name = "confirmed_at")
+    private Instant confirmedAt;
+
     protected InventoryReservation() {
     }
 
@@ -61,6 +65,13 @@ class InventoryReservation {
         }
     }
 
+    void confirm() {
+        if (status == Status.ACTIVE) {
+            status = Status.CONFIRMED;
+            confirmedAt = Instant.now();
+        }
+    }
+
     String businessKey() {
         return businessKey;
     }
@@ -75,5 +86,9 @@ class InventoryReservation {
 
     boolean active() {
         return status == Status.ACTIVE;
+    }
+
+    boolean confirmed() {
+        return status == Status.CONFIRMED;
     }
 }

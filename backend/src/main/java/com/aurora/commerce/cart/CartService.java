@@ -80,6 +80,22 @@ class CartService {
     CheckoutPreview checkoutPreview(Long userId) {
         List<CartItem> selectedItems = cartRepository.findByUserIdOrderByUpdatedAtDesc(userId)
                 .stream().filter(CartItem::selected).toList();
+        return buildCheckoutPreview(selectedItems);
+    }
+
+    @Transactional
+    OrderCart orderCart(Long userId) {
+        CheckoutPreview preview = buildCheckoutPreview(cartRepository.findSelectedForOrder(userId));
+        return new OrderCart(
+                preview.items().stream().map(item -> new OrderCartLine(
+                        item.cartItemId(), item.skuId(), item.productId(), item.productName(), item.skuName(),
+                        item.imageUrl(), item.unitPrice(), item.quantity(), item.subtotal()
+                )).toList(),
+                preview.goodsAmount(), preview.discountAmount(), preview.shippingAmount(), preview.payableAmount()
+        );
+    }
+
+    private CheckoutPreview buildCheckoutPreview(List<CartItem> selectedItems) {
         if (selectedItems.isEmpty()) {
             throw new BusinessException("EMPTY_CHECKOUT", "请至少勾选一件商品", HttpStatus.BAD_REQUEST);
         }
@@ -109,6 +125,13 @@ class CartService {
                 : STANDARD_SHIPPING_FEE;
         BigDecimal payableAmount = money(goodsAmount.add(shippingAmount));
         return new CheckoutPreview(items, goodsAmount, BigDecimal.ZERO.setScale(2), shippingAmount, payableAmount);
+    }
+
+    @Transactional
+    void clearOrderedItems(Long userId, List<Long> itemIds) {
+        if (!itemIds.isEmpty()) {
+            cartRepository.deleteOwnedItems(userId, itemIds);
+        }
     }
 
     private CartView enrich(List<CartItem> cartItems) {
@@ -196,6 +219,28 @@ class CartService {
 
     record CheckoutPreview(
             List<CheckoutItem> items,
+            BigDecimal goodsAmount,
+            BigDecimal discountAmount,
+            BigDecimal shippingAmount,
+            BigDecimal payableAmount
+    ) {
+    }
+
+    record OrderCartLine(
+            Long cartItemId,
+            Long skuId,
+            Long productId,
+            String productName,
+            String skuName,
+            String imageUrl,
+            BigDecimal unitPrice,
+            int quantity,
+            BigDecimal subtotal
+    ) {
+    }
+
+    record OrderCart(
+            List<OrderCartLine> items,
             BigDecimal goodsAmount,
             BigDecimal discountAmount,
             BigDecimal shippingAmount,

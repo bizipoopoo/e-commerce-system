@@ -112,6 +112,35 @@ public class InventoryFacade {
     }
 
     @Transactional
+    public void confirm(String businessKey) {
+        List<InventoryReservation> reservations = reservationRepository
+                .findByBusinessKeyOrderBySkuIdAsc(businessKey);
+        if (reservations.isEmpty()) {
+            throw new BusinessException(
+                    "INVENTORY_RESERVATION_NOT_FOUND", "库存预占不存在", HttpStatus.CONFLICT);
+        }
+        if (reservations.stream().noneMatch(InventoryReservation::active)) {
+            if (reservations.stream().allMatch(InventoryReservation::confirmed)) {
+                return;
+            }
+            throw new BusinessException(
+                    "INVENTORY_RESERVATION_CONFLICT", "库存预占已经释放", HttpStatus.CONFLICT);
+        }
+        for (InventoryReservation reservation : reservations.stream().filter(InventoryReservation::active).toList()) {
+            if (inventoryRepository.confirmReserved(reservation.skuId(), reservation.quantity()) != 1) {
+                throw new IllegalStateException("Reserved inventory is inconsistent for " + reservation.skuId());
+            }
+            reservation.confirm();
+            Inventory inventory = inventoryRepository.findById(reservation.skuId())
+                    .orElseThrow(() -> inventoryNotFound(reservation.skuId()));
+            transactionRepository.save(new InventoryTransaction(
+                    reservation.skuId(), "DEDUCT", -reservation.quantity(), inventory.totalQuantity(),
+                    inventory.reservedQuantity(), businessKey, "支付确认扣减"
+            ));
+        }
+    }
+
+    @Transactional
     public StockView setInventory(Long skuId, int totalQuantity, int warningQuantity, String reason) {
         if (!catalogFacade.skuExists(skuId)) {
             throw new BusinessException("SKU_NOT_FOUND", "SKU 不存在: " + skuId, HttpStatus.NOT_FOUND);
@@ -148,11 +177,13 @@ public class InventoryFacade {
     }
 
     private void validateReservationRequest(String businessKey, Map<Long, Integer> quantities) {
-        if (businessKey == null || businessKey.isBlank() || businessKey.length() > 100 || quantities.isEmpty()) {
+        if (businessKey == null || businessKey.isBlank() || businessKey.length() > 100
+                || quantities == null || quantities.isEmpty()) {
             throw new BusinessException(
                     "INVALID_RESERVATION_REQUEST", "库存预占请求无效", HttpStatus.BAD_REQUEST);
         }
-        if (quantities.values().stream().anyMatch(quantity -> quantity == null || quantity <= 0)) {
+        if (quantities.entrySet().stream().anyMatch(entry ->
+                entry.getKey() == null || entry.getValue() == null || entry.getValue() <= 0)) {
             throw new BusinessException(
                     "INVALID_RESERVATION_QUANTITY", "预占数量必须大于 0", HttpStatus.BAD_REQUEST);
         }
