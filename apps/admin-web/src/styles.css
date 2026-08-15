@@ -1,0 +1,94 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
+
+:root { font-family: 'DM Sans', 'PingFang SC', sans-serif; color: #202824; background: #f4f6f4; font-synthesis: none; }
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 1180px; }
+button, input, select { font: inherit; }
+button, a { color: inherit; }
+a { text-decoration: none; }
+.console { display: grid; grid-template-columns: 232px 1fr; min-height: 100vh; }
+aside { position: relative; display: flex; flex-direction: column; min-height: 100vh; padding: 0 14px 22px; background: #173a2a; color: #dfe8e2; }
+.console-brand { height: 72px; display: flex; align-items: center; gap: 11px; padding: 0 12px; font-family: Georgia, serif; font-size: 27px; }
+.console-brand > span { padding-left: 11px; border-left: 1px solid #496557; font-family: 'DM Sans'; font-size: 14px; letter-spacing: .18em; }
+.workspace { position: relative; margin-bottom: 18px; padding: 11px 30px 11px 12px; border: 1px solid #385747; border-radius: 7px; background: #214632; }
+.workspace small { display: block; margin-bottom: 3px; color: #8fa69a; font-size: 9px; }
+.workspace strong { font-size: 11px; font-weight: 500; }
+.workspace > span { position: absolute; right: 12px; top: 18px; }
+aside nav { display: grid; gap: 3px; }
+aside nav a, .aside-bottom a { height: 42px; display: flex; align-items: center; gap: 12px; padding: 0 12px; border-radius: 6px; color: #9fb1a7; font-size: 12px; }
+aside nav a:hover, aside nav a.active { background: #2a513b; color: white; }
+aside nav i { width: 18px; text-align: center; font-style: normal; font-size: 15px; }
+aside nav b { margin-left: auto; min-width: 20px; padding: 3px 6px; border-radius: 9px; background: #d76a42; color: white; text-align: center; font-size: 8px; }
+.aside-bottom { display: grid; gap: 3px; margin-top: auto; padding-top: 14px; border-top: 1px solid #315040; }
+.aside-bottom a { height: 36px; }
+.main-area { min-width: 0; }
+.main-area > header { height: 64px; display: flex; align-items: center; justify-content: space-between; padding: 0 32px; border-bottom: 1px solid #e3e7e3; background: white; }
+.search { width: 340px; display: flex; align-items: center; gap: 10px; color: #7a857f; }
+.search input { flex: 1; border: 0; outline: 0; font-size: 11px; }
+.search kbd { padding: 4px 7px; border: 1px solid #dce1dd; border-radius: 4px; background: #f5f7f5; font-size: 8px; font-weight: 400; }
+.header-tools { display: flex; align-items: center; gap: 9px; }
+.header-tools button { position: relative; border: 0; background: transparent; cursor: pointer; }
+.header-tools button b { position: absolute; top: 2px; right: 2px; width: 5px; height: 5px; border-radius: 50%; background: #d8653c; }
+.header-tools > span { height: 24px; width: 1px; margin: 0 6px; background: #e3e6e3; }
+.avatar { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; background: #dfe9e3; color: #28513a; font-size: 9px; font-weight: 600; }
+.header-tools div strong { display: block; font-size: 10px; }
+.header-tools div small { color: #9ba39e; font-size: 8px; }
+main { padding: 28px 32px 40px; }
+.welcome { display: flex; align-items: end; justify-content: space-between; margin-bottom: 24px; }
+.welcome p { margin: 0 0 7px; color: #8f9993; font-size: 9px; }
+.welcome h1 { margin: 0 0 4px; font-size: 24px; font-weight: 600; letter-spacing: -.03em; }
+.welcome span { color: #7e8982; font-size: 10px; }
+.welcome-actions { display: flex; gap: 8px; }
+.welcome-actions button { height: 35px; padding: 0 15px; border: 1px solid #dce1dd; border-radius: 5px; background: white; font-size: 10px; cursor: pointer; }
+.welcome-actions .solid { border-color: #1c4a34; background: #1c4a34; color: white; }
+.metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+.metrics article, .panel { border: 1px solid #e1e5e1; border-radius: 8px; background: white; box-shadow: 0 2px 6px rgba(31,54,41,.025); }
+.metrics article { padding: 18px 18px 15px; }
+.metrics article > div { display: flex; justify-content: space-between; color: #818b85; font-size: 10px; }
+.metrics article button, .panel-title button { border: 0; background: transparent; color: #939b96; }
+.metrics article > strong { display: block; margin: 14px 0 9px; font-size: 23px; letter-spacing: -.02em; }
+.metrics article p { margin: 0; color: #a0a7a2; font-size: 8px; }
+.metrics article p b { margin-right: 8px; padding: 3px 5px; border-radius: 3px; font-weight: 500; }
+.metrics .green { background: #eaf5ef; color: #278052; }
+.metrics .orange { background: #fff0e9; color: #cb6844; }
+.dashboard-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; }
+.panel { min-width: 0; padding: 19px; }
+.panel-title { display: flex; justify-content: space-between; align-items: start; }
+.panel-title h2 { margin: 0 0 4px; font-size: 13px; }
+.panel-title p { margin: 0; color: #929b96; font-size: 8px; }
+.panel-title a { color: #34644a; font-size: 9px; }
+.tabs { display: flex; gap: 4px; }
+.tabs button, .tabs select { height: 27px; padding: 0 9px; border: 1px solid #e0e4e1; border-radius: 4px; background: white; color: #737e77; font-size: 8px; }
+.tabs button:first-child { background: #eaf2ed; color: #285b3f; }
+.chart { height: 205px; display: grid; grid-template-columns: 30px 1fr; margin-top: 21px; }
+.axis { display: flex; flex-direction: column; justify-content: space-between; padding-bottom: 20px; color: #a1a8a3; font-size: 7px; }
+.bars { display: flex; align-items: end; gap: 9px; padding: 0 5px; border-bottom: 1px solid #e7eae7; background: repeating-linear-gradient(to bottom, #fff 0, #fff 45px, #f0f2f0 46px); }
+.bar-wrap { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: end; align-items: center; gap: 7px; }
+.bar { width: 100%; max-width: 18px; border-radius: 3px 3px 0 0; background: #2d6848; opacity: .9; }
+.bar-wrap:nth-child(12) .bar { background: #d66b44; }
+.bar-wrap span { margin-bottom: -17px; color: #9da59f; font-size: 6px; }
+.funnel-list { display: grid; gap: 12px; margin-top: 22px; }
+.funnel-list > div { display: grid; grid-template-columns: 1fr 90px; align-items: center; gap: 12px; }
+.funnel-list > div > span { height: 8px; border-radius: 4px; background: #eef1ef; overflow: hidden; }
+.funnel-list i { display: block; width: var(--w); height: 100%; border-radius: 4px; background: #3c7657; }
+.funnel-list p { display: flex; align-items: center; justify-content: space-between; margin: 0; color: #8d9690; font-size: 8px; }
+.funnel-list b { color: #35413a; font-size: 10px; }
+.conversion { display: flex; align-items: center; gap: 12px; margin-top: 21px; padding: 13px; border-radius: 5px; background: #f3f7f4; }
+.conversion > strong { color: #2c6647; font-size: 22px; }
+.conversion span { color: #7f8b84; font-size: 8px; line-height: 1.7; }
+.conversion span b { color: #2e8253; font-weight: 500; }
+.orders { padding-bottom: 8px; }
+table { width: 100%; margin-top: 15px; border-collapse: collapse; text-align: left; font-size: 9px; }
+th { height: 29px; color: #959d98; font-size: 7px; font-weight: 500; }
+td { height: 38px; border-top: 1px solid #edf0ed; color: #66716a; }
+td strong { color: #344038; font-weight: 500; }
+.status { padding: 4px 7px; border-radius: 9px; background: #eaf4ee; color: #347752; font-size: 7px; }
+.status.售后中 { background: #fff0e9; color: #c35f3e; }
+.status.已完成 { background: #f0f2f0; color: #7f8983; }
+.todo-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 15px; }
+.todo-grid a { position: relative; min-height: 76px; display: grid; grid-template-columns: 25px 1fr; grid-template-rows: 1fr 1fr; padding: 12px; border: 1px solid #e9ece9; border-radius: 5px; }
+.todo-grid i { grid-row: 1 / 3; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 50%; background: #edf4ef; color: #346249; font-style: normal; font-size: 10px; }
+.todo-grid strong { font-size: 17px; line-height: 1; }
+.todo-grid span { color: #89938d; font-size: 8px; }
+@media (max-width: 1280px) { .console { grid-template-columns: 210px 1fr; } main { padding-left: 22px; padding-right: 22px; } }
+

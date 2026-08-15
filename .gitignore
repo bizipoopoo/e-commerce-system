@@ -1,0 +1,20 @@
+.DS_Store
+.idea/
+.vscode/
+*.iml
+
+# Java
+backend/target/
+*.log
+
+# Node
+node_modules/
+dist/
+coverage/
+.vite/
+*.tsbuildinfo
+
+# Local configuration
+.env
+.env.*
+!.env.example

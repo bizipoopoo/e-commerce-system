@@ -1,0 +1,20 @@
+{
+  "name": "@aurora/admin-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --port 5174",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --port 4174"
+  },
+  "dependencies": {
+    "@vitejs/plugin-vue": "latest",
+    "vite": "latest",
+    "vue": "latest"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vue-tsc": "3.3.9"
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "aurora-commerce-web",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:storefront": "npm run dev -w @aurora/storefront",
+    "dev:admin": "npm run dev -w @aurora/admin-web",
+    "build": "npm run build --workspaces --if-present",
+    "build:storefront": "npm run build -w @aurora/storefront",
+    "build:admin": "npm run build -w @aurora/admin-web"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "typescript": "5.9.3"
+  }
+}

@@ -1,0 +1,33 @@
+spring:
+  application:
+    name: aurora-commerce
+  datasource:
+    url: jdbc:h2:mem:aurora;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+server:
+  port: 8080
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+
+info:
+  app:
+    name: Aurora Commerce
+    stage: development
+
