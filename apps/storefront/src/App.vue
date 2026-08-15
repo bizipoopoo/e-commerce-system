@@ -1,47 +1,93 @@
 <script setup lang="ts">
-const categories = [
-  { icon: '◌', name: '今日上新', caption: 'NEW ARRIVALS' },
-  { icon: '⌂', name: '居家生活', caption: 'LIVING' },
-  { icon: '◇', name: '数码精选', caption: 'DIGITAL' },
-  { icon: '✦', name: '美妆个护', caption: 'BEAUTY' },
-  { icon: '♧', name: '户外运动', caption: 'OUTDOOR' },
-  { icon: '◐', name: '服饰穿搭', caption: 'STYLE' },
-]
+import { computed, onMounted, ref } from 'vue'
+import { ApiError, getHome, type Category, type ProductCard } from './api'
+import { useSessionStore } from './session'
 
-const products = [
-  {
-    name: '云感人体工学休闲椅',
-    category: 'AURORA HOME',
-    price: '2,499',
-    original: '2,899',
-    tag: '设计师精选',
-    image: 'https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?auto=format&fit=crop&w=1000&q=85',
-  },
-  {
-    name: '晨雾手冲咖啡套装',
-    category: 'DAILY RITUAL',
-    price: '429',
-    original: '529',
-    tag: '本周热销',
-    image: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1000&q=85',
-  },
-  {
-    name: '原木无线氛围音箱',
-    category: 'SOUND & LIGHT',
-    price: '899',
-    original: '1,099',
-    tag: '新品首发',
-    image: 'https://images.unsplash.com/photo-1545454675-3531b543be5d?auto=format&fit=crop&w=1000&q=85',
-  },
-  {
-    name: '山系轻量城市双肩包',
-    category: 'URBAN OUTDOOR',
-    price: '569',
-    original: '699',
-    tag: '会员专享',
-    image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=1000&q=85',
-  },
-]
+const session = useSessionStore()
+const categories = ref<Array<Category & { caption: string }>>([])
+const products = ref<Array<ProductCard & { tag: string }>>([])
+const heroImage = ref('')
+const featureImage = ref('')
+const loading = ref(true)
+const loadError = ref('')
+const authOpen = ref(false)
+const authMode = ref<'login' | 'register'>('login')
+const email = ref('')
+const password = ref('')
+const displayName = ref('')
+const authError = ref('')
+const authSubmitting = ref(false)
+const accountMenuOpen = ref(false)
+
+const authTitle = computed(() => authMode.value === 'login' ? '欢迎回来' : '加入 Aurora')
+
+const tags = ['设计师精选', '本周热销', '新品首发', '会员专享']
+
+async function loadHome() {
+  loading.value = true
+  loadError.value = ''
+  try {
+    const home = await getHome()
+    categories.value = home.categories.map(item => ({
+      ...item,
+      caption: item.slug.replaceAll('-', ' ').toUpperCase(),
+    }))
+    products.value = home.featuredProducts.map((item, index) => ({
+      ...item,
+      tag: tags[index % tags.length],
+    }))
+    heroImage.value = home.heroBanners[0]?.imageUrl ?? ''
+    featureImage.value = home.featureBanners[0]?.imageUrl ?? ''
+  } catch {
+    loadError.value = '首页数据暂时无法加载，请确认后端服务已经启动。'
+  } finally {
+    loading.value = false
+  }
+}
+
+function openAccount() {
+  if (session.authenticated) {
+    accountMenuOpen.value = !accountMenuOpen.value
+    return
+  }
+  authOpen.value = true
+}
+
+function logout() {
+  session.logout()
+  accountMenuOpen.value = false
+}
+
+async function submitAuth() {
+  authSubmitting.value = true
+  authError.value = ''
+  try {
+    if (authMode.value === 'login') {
+      await session.login(email.value, password.value)
+    } else {
+      await session.register(email.value, password.value, displayName.value)
+    }
+    authOpen.value = false
+    password.value = ''
+  } catch (error) {
+    authError.value = error instanceof ApiError
+      ? error.message
+      : error instanceof Error
+        ? `会话处理失败：${error.message}`
+        : '暂时无法完成操作，请稍后再试。'
+  } finally {
+    authSubmitting.value = false
+  }
+}
+
+function switchAuthMode() {
+  authMode.value = authMode.value === 'login' ? 'register' : 'login'
+  authError.value = ''
+}
+
+onMounted(() => {
+  void Promise.all([loadHome(), session.restore()])
+})
 
 const stories = [
   { number: '01', title: '让家，成为恢复能量的地方', meta: '空间灵感 · 8 MIN READ' },
@@ -65,10 +111,21 @@ const stories = [
       </nav>
       <div class="header-actions">
         <button aria-label="搜索">⌕</button>
-        <button aria-label="个人中心">♙</button>
+        <button class="account-button" aria-label="个人中心" @click="openAccount">
+          {{ session.user?.displayName || '登录' }}
+        </button>
+        <div v-if="accountMenuOpen && session.user" class="account-menu">
+          <strong>{{ session.user.displayName }}</strong>
+          <span>{{ session.user.email }}</span>
+          <button @click="logout">退出登录</button>
+        </div>
         <button class="cart" aria-label="购物车">购物袋 <b>2</b></button>
       </div>
     </header>
+
+    <div v-if="loadError" class="load-error container">
+      <span>{{ loadError }}</span><button @click="loadHome">重新加载</button>
+    </div>
 
     <main>
       <section class="hero container">
@@ -87,7 +144,8 @@ const stories = [
           </div>
         </div>
         <div class="hero-visual">
-          <img src="https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=1400&q=88" alt="温暖现代的家居空间" />
+          <div v-if="loading" class="hero-placeholder"></div>
+          <img v-else-if="heroImage" :src="heroImage" alt="温暖现代的家居空间" />
           <div class="floating-card">
             <span>EDITOR'S PICK</span>
             <strong>原木与光</strong>
@@ -98,7 +156,7 @@ const stories = [
       </section>
 
       <section class="category-section container" id="new">
-        <div v-for="item in categories" :key="item.name" class="category-item">
+        <div v-for="item in categories" :key="item.id" class="category-item">
           <div class="category-icon">{{ item.icon }}</div>
           <strong>{{ item.name }}</strong>
           <span>{{ item.caption }}</span>
@@ -111,22 +169,23 @@ const stories = [
           <a href="#">查看全部商品 <span>→</span></a>
         </div>
         <div class="product-grid">
-          <article v-for="product in products" :key="product.name" class="product-card">
+          <article v-for="product in products" :key="product.id" class="product-card">
             <div class="product-image">
-              <img :src="product.image" :alt="product.name" />
+              <img :src="product.coverImageUrl" :alt="product.name" />
               <span class="product-tag">{{ product.tag }}</span>
               <button class="favorite" aria-label="收藏">♡</button>
               <button class="quick-add">快速加入购物袋</button>
             </div>
-            <p>{{ product.category }}</p>
+            <p>{{ product.brandName }}</p>
             <h3>{{ product.name }}</h3>
-            <div class="price"><strong>¥{{ product.price }}</strong><del>¥{{ product.original }}</del></div>
+            <div class="price"><strong>¥{{ product.salePrice.toLocaleString() }}</strong><del>¥{{ product.marketPrice.toLocaleString() }}</del></div>
           </article>
+          <div v-if="loading" v-for="index in 4" :key="`skeleton-${index}`" class="product-skeleton"></div>
         </div>
       </section>
 
       <section class="feature-banner container">
-        <div class="feature-image"></div>
+        <div class="feature-image" :style="featureImage ? { backgroundImage: `linear-gradient(90deg, transparent 70%, rgba(29,74,53,.2)), url('${featureImage}')` } : undefined"></div>
         <div class="feature-copy">
           <p class="eyebrow">A BETTER EVERYDAY</p>
           <h2>不是更多，<br />而是更好的选择</h2>
@@ -156,6 +215,22 @@ const stories = [
         <p class="copyright">© 2026 AURORA COMMERCE</p>
       </div>
     </footer>
+
+    <div v-if="authOpen" class="auth-overlay" @click.self="authOpen = false">
+      <form class="auth-dialog" role="dialog" aria-modal="true" :aria-label="authTitle" @submit.prevent="submitAuth">
+        <button class="auth-close" type="button" aria-label="关闭" @click="authOpen = false">×</button>
+        <p class="eyebrow">AURORA MEMBER</p>
+        <h2>{{ authTitle }}</h2>
+        <p>{{ authMode === 'login' ? '登录后同步你的收藏、订单和专属推荐。' : '创建账户，开始更懂你的生活提案。' }}</p>
+        <label v-if="authMode === 'register'">称呼<input v-model.trim="displayName" required maxlength="80" placeholder="你的称呼" /></label>
+        <label>邮箱<input v-model.trim="email" required type="email" autocomplete="email" placeholder="name@example.com" /></label>
+        <label>密码<input v-model="password" required type="password" minlength="8" :autocomplete="authMode === 'login' ? 'current-password' : 'new-password'" placeholder="至少 8 位字符" /></label>
+        <div v-if="authError" class="auth-error">{{ authError }}</div>
+        <button class="auth-submit" :disabled="authSubmitting">{{ authSubmitting ? '请稍候…' : authMode === 'login' ? '登录' : '创建账户' }}</button>
+        <button class="auth-switch" type="button" @click="switchAuthMode">
+          {{ authMode === 'login' ? '还没有账户？立即注册' : '已有账户？返回登录' }}
+        </button>
+      </form>
+    </div>
   </div>
 </template>
-

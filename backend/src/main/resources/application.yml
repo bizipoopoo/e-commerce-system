@@ -1,6 +1,8 @@
 spring:
   application:
     name: aurora-commerce
+  profiles:
+    default: local
   datasource:
     url: jdbc:h2:mem:aurora;MODE=MySQL;DATABASE_TO_LOWER=TRUE
     username: sa
@@ -12,6 +14,7 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+    locations: classpath:db/migration
 
 server:
   port: 8080
@@ -36,3 +39,10 @@ commerce:
     allowed-origins:
       - ${STOREFRONT_ORIGIN:http://localhost:5173}
       - ${ADMIN_ORIGIN:http://localhost:5174}
+      - ${STOREFRONT_LOOPBACK_ORIGIN:http://127.0.0.1:5173}
+      - ${ADMIN_LOOPBACK_ORIGIN:http://127.0.0.1:5174}
+  security:
+    jwt-secret: ${JWT_SECRET:aurora-commerce-demo-secret-change-before-production-2026}
+    access-token-ttl: 2h
+  bootstrap:
+    enabled: false

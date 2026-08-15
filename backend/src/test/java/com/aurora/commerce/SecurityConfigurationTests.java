@@ -25,6 +25,8 @@ class SecurityConfigurationTests {
     @Test
     void rejectsApisThatAreNotExplicitlyPublic() throws Exception {
         mockMvc.perform(get("/api/v1/not-public"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .jsonPath("$.code").value("UNAUTHORIZED"));
     }
 }

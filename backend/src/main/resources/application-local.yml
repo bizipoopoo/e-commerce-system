@@ -1,0 +1,9 @@
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/demo
+
+commerce:
+  bootstrap:
+    enabled: ${DEMO_BOOTSTRAP_ENABLED:true}
+    admin-email: ${DEMO_ADMIN_EMAIL:admin@aurora.local}
+    admin-password: ${DEMO_ADMIN_PASSWORD:Aurora@2026}

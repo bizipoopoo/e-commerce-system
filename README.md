@@ -5,7 +5,7 @@ Aurora Commerce 是一套面向 Web 的全功能电商演示系统。项目采�
 ## 当前基线
 
 - 后端：Java 21、Spring Boot、Spring Modulith、Spring Security、JPA、Flyway
-- 用户端：Vue 3、TypeScript、Vite
+- 用户端：Vue 3、TypeScript、Vite、Pinia
 - 运营端：Vue 3、TypeScript、Vite
 - 本地默认：H2 内存数据库，无需 Docker
 - 完整环境：MySQL、Redis，使用 Docker Compose
@@ -43,6 +43,13 @@ npm run dev:admin
 - 商城用户端：`http://localhost:5173`
 - 运营后台：`http://localhost:5174`
 
+本地默认使用 `local` Profile，并自动加载演示商品及管理员：
+
+- 邮箱：`admin@aurora.local`
+- 密码：`Aurora@2026`
+
+生产环境必须启用 `prod` Profile，并提供 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 和不少于 32 字节的 `JWT_SECRET`。生产 Profile 不创建演示管理员，也不加载演示数据。
+
 ## 产品与技术文档
 
 - [产品需求文档](docs/01-prd.md)
@@ -51,3 +58,4 @@ npm run dev:admin
 - [API 设计](docs/04-api-design.md)
 - [一周交付计划](docs/05-delivery-plan.md)
 - [阶段研发与 Code Review 流程](docs/06-engineering-workflow.md)
+- [Stage 02：身份、商品与首页数据化](docs/stages/stage-02-identity-catalog.md)

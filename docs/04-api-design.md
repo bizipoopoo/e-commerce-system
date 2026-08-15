@@ -36,7 +36,23 @@
 | 消息 | `GET /notifications`, `GET /notifications/stream` |
 | 管理端 | `/admin/products`, `/admin/inventories`, `/admin/orders`, `/admin/content` |
 
-## 3. 错误码
+## 3. Stage 02 已实现接口
+
+| 方法 | 路径 | 权限 | 说明 |
+|---|---|---|---|
+| POST | `/auth/register` | 公开 | 邮箱注册并签发访问令牌 |
+| POST | `/auth/login` | 公开 | 登录并签发访问令牌 |
+| GET | `/me` | 登录用户 | 获取当前用户 |
+| GET | `/home` | 公开 | 首页 Banner、类目和商品聚合 |
+| GET | `/categories` | 公开 | 启用类目列表 |
+| GET | `/products` | 公开 | 商品关键词、类目筛选和分页 |
+| GET | `/products/{id}` | 公开 | 已上架商品详情与 SKU |
+| POST | `/admin/products` | ADMIN | 创建草稿商品与 SKU |
+| PUT | `/admin/products/{id}` | ADMIN | 编辑商品基础资料 |
+| PATCH | `/admin/products/{id}/publish` | ADMIN | 上架商品 |
+| PATCH | `/admin/products/{id}/archive` | ADMIN | 下架归档商品 |
+
+## 4. 错误码
 
 | 错误码 | 含义 |
 |---|---|
@@ -48,4 +64,8 @@
 | `PRICE_CHANGED` | 结算期间价格变化 |
 | `ORDER_STATE_CONFLICT` | 当前订单状态不允许操作 |
 | `DUPLICATE_REQUEST` | 重复请求 |
-
+| `EMAIL_ALREADY_REGISTERED` | 邮箱已经注册 |
+| `INVALID_CREDENTIALS` | 登录凭据错误 |
+| `PRODUCT_NOT_FOUND` | 商品不存在或不可见 |
+| `INVALID_SKU_PRICE` | SKU 市场价低于销售价 |
+| `DATA_CONFLICT` | 唯一键或数据引用冲突 |
