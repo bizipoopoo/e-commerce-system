@@ -15,6 +15,7 @@ export interface Category {
 
 export interface ProductCard {
   id: number
+  defaultSkuId: number | null
   name: string
   subtitle: string
   coverImageUrl: string
@@ -53,6 +54,46 @@ export interface AuthResult {
   accessToken: string
   expiresIn: number
   user: User
+}
+
+export interface CartItem {
+  id: number
+  skuId: number
+  productId: number | null
+  productName: string
+  skuName: string
+  imageUrl: string
+  unitPrice: number
+  quantity: number
+  subtotal: number
+  selected: boolean
+  available: boolean
+  availableQuantity: number
+}
+
+export interface CartData {
+  items: CartItem[]
+  totalQuantity: number
+  selectedQuantity: number
+  selectedAmount: number
+}
+
+export interface CheckoutPreview {
+  items: Array<{
+    cartItemId: number
+    skuId: number
+    productId: number
+    productName: string
+    skuName: string
+    imageUrl: string
+    unitPrice: number
+    quantity: number
+    subtotal: number
+  }>
+  goodsAmount: number
+  discountAmount: number
+  shippingAmount: number
+  payableAmount: number
 }
 
 export class ApiError extends Error {

@@ -34,6 +34,8 @@ interface ProductRepository extends JpaRepository<Product, Long> {
 }
 
 interface ProductSkuRepository extends JpaRepository<ProductSku, Long> {
+    List<ProductSku> findByIdInAndStatus(Collection<Long> skuIds, SkuStatus status);
+
     List<ProductSku> findByProductIdInAndStatus(Collection<Long> productIds, SkuStatus status);
 
     List<ProductSku> findByProductIdAndStatusOrderBySalePriceAsc(Long productId, SkuStatus status);

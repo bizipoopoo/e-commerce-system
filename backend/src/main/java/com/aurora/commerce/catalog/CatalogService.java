@@ -169,20 +169,20 @@ class CatalogService {
                 .stream().collect(Collectors.groupingBy(ProductSku::productId));
         return products.stream().map(product -> {
             List<ProductSku> productSkus = skus.getOrDefault(product.id(), List.of());
-            BigDecimal salePrice = minPrice(productSkus, ProductSku::salePrice);
-            BigDecimal marketPrice = minPrice(productSkus, ProductSku::marketPrice);
+            ProductSku defaultSku = productSkus.stream()
+                    .min(Comparator.comparing(ProductSku::salePrice))
+                    .orElse(null);
+            BigDecimal salePrice = defaultSku == null ? BigDecimal.ZERO : defaultSku.salePrice();
+            BigDecimal marketPrice = defaultSku == null ? BigDecimal.ZERO : defaultSku.marketPrice();
             Category category = categories.get(product.categoryId());
             Brand brand = brands.get(product.brandId());
             return new ProductCard(
-                    product.id(), product.name(), product.subtitle(), product.coverImageUrl(),
+                    product.id(), defaultSku == null ? null : defaultSku.id(),
+                    product.name(), product.subtitle(), product.coverImageUrl(),
                     salePrice, marketPrice, product.rating(), product.salesCount(),
                     category == null ? null : category.name(), brand == null ? null : brand.name()
             );
         }).toList();
-    }
-
-    private BigDecimal minPrice(List<ProductSku> skus, Function<ProductSku, BigDecimal> extractor) {
-        return skus.stream().map(extractor).min(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
     }
 
     private SkuView toSkuView(ProductSku sku) {
@@ -241,6 +241,7 @@ class CatalogService {
 
     record ProductCard(
             Long id,
+            Long defaultSkuId,
             String name,
             String subtitle,
             String coverImageUrl,

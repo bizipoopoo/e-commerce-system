@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ApiError, getHome, type Category, type ProductCard } from './api'
+import { useCartStore } from './cart'
 import { useSessionStore } from './session'
 
 const session = useSessionStore()
+const cart = useCartStore()
 const categories = ref<Array<Category & { caption: string }>>([])
 const products = ref<Array<ProductCard & { tag: string }>>([])
 const heroImage = ref('')
@@ -55,6 +57,7 @@ function openAccount() {
 
 function logout() {
   session.logout()
+  cart.reset()
   accountMenuOpen.value = false
 }
 
@@ -69,6 +72,7 @@ async function submitAuth() {
     }
     authOpen.value = false
     password.value = ''
+    void cart.load().catch(() => undefined)
   } catch (error) {
     authError.value = error instanceof ApiError
       ? error.message
@@ -85,8 +89,69 @@ function switchAuthMode() {
   authError.value = ''
 }
 
+async function addToCart(skuId: number | null) {
+  if (!session.authenticated) {
+    authOpen.value = true
+    return
+  }
+  if (skuId == null) return
+  try {
+    await cart.add(skuId)
+  } catch {
+    cart.drawerOpen = true
+  }
+}
+
+async function openCart() {
+  if (!session.authenticated) {
+    authOpen.value = true
+    return
+  }
+  cart.drawerOpen = true
+  try {
+    await cart.load()
+  } catch {
+    // The cart drawer presents the actionable error.
+  }
+}
+
+async function changeQuantity(itemId: number, current: number, delta: number) {
+  const next = current + delta
+  if (next < 1 || next > 99) return
+  try {
+    await cart.update(itemId, { quantity: next })
+  } catch {
+    // The cart drawer presents the actionable error.
+  }
+}
+
+async function setSelected(itemId: number, selected: boolean) {
+  try {
+    await cart.update(itemId, { selected })
+  } catch {
+    // The cart drawer presents the actionable error.
+  }
+}
+
+async function removeCartItem(itemId: number) {
+  try {
+    await cart.remove(itemId)
+  } catch {
+    // The cart drawer presents the actionable error.
+  }
+}
+
+async function previewCheckout() {
+  try {
+    await cart.previewCheckout()
+  } catch {
+    // The cart drawer presents the actionable error.
+  }
+}
+
 onMounted(() => {
-  void Promise.all([loadHome(), session.restore()])
+  void loadHome()
+  void session.restore().then(() => cart.load()).catch(() => undefined)
 })
 
 const stories = [
@@ -119,7 +184,7 @@ const stories = [
           <span>{{ session.user.email }}</span>
           <button @click="logout">退出登录</button>
         </div>
-        <button class="cart" aria-label="购物车">购物袋 <b>2</b></button>
+        <button class="cart" aria-label="购物车" @click="openCart">购物袋 <b>{{ cart.data.totalQuantity }}</b></button>
       </div>
     </header>
 
@@ -174,7 +239,7 @@ const stories = [
               <img :src="product.coverImageUrl" :alt="product.name" />
               <span class="product-tag">{{ product.tag }}</span>
               <button class="favorite" aria-label="收藏">♡</button>
-              <button class="quick-add">快速加入购物袋</button>
+              <button class="quick-add" :disabled="product.defaultSkuId == null" @click="addToCart(product.defaultSkuId)">快速加入购物袋</button>
             </div>
             <p>{{ product.brandName }}</p>
             <h3>{{ product.name }}</h3>
@@ -231,6 +296,49 @@ const stories = [
           {{ authMode === 'login' ? '还没有账户？立即注册' : '已有账户？返回登录' }}
         </button>
       </form>
+    </div>
+
+    <div v-if="cart.drawerOpen" class="cart-overlay" @click.self="cart.drawerOpen = false">
+      <aside class="cart-drawer" aria-label="购物袋">
+        <header>
+          <div><p class="eyebrow">YOUR SELECTION</p><h2>购物袋 <span>{{ cart.data.totalQuantity }}</span></h2></div>
+          <button aria-label="关闭购物袋" @click="cart.drawerOpen = false">×</button>
+        </header>
+        <div v-if="cart.error" class="cart-error">{{ cart.error }}</div>
+        <div v-if="cart.data.items.length === 0" class="empty-cart">
+          <strong>购物袋还是空的</strong><p>去挑选一些值得带回家的好物吧。</p>
+          <button @click="cart.drawerOpen = false">继续逛逛</button>
+        </div>
+        <div v-else class="cart-items">
+          <article v-for="item in cart.data.items" :key="item.id" :class="{ unavailable: !item.available }">
+            <input :checked="item.selected" :disabled="!item.available || cart.loading" type="checkbox" :aria-label="`选择${item.productName}`" @change="setSelected(item.id, ($event.target as HTMLInputElement).checked)" />
+            <img :src="item.imageUrl" :alt="item.productName" />
+            <div class="cart-item-copy">
+              <h3>{{ item.productName }}</h3><p>{{ item.skuName }}</p>
+              <strong>¥{{ item.unitPrice.toLocaleString() }}</strong>
+              <span v-if="!item.available">库存不足或商品已失效</span>
+              <div class="quantity-control">
+                <button :disabled="cart.loading || item.quantity <= 1" @click="changeQuantity(item.id, item.quantity, -1)">−</button>
+                <b>{{ item.quantity }}</b>
+                <button :disabled="cart.loading || item.quantity >= item.availableQuantity" @click="changeQuantity(item.id, item.quantity, 1)">＋</button>
+              </div>
+            </div>
+            <button class="remove-item" aria-label="删除商品" @click="removeCartItem(item.id)">×</button>
+          </article>
+        </div>
+        <footer v-if="cart.data.items.length">
+          <div><span>已选 {{ cart.data.selectedQuantity }} 件</span><strong>¥{{ cart.data.selectedAmount.toLocaleString() }}</strong></div>
+          <div v-if="cart.checkout" class="checkout-breakdown">
+            <p><span>商品金额</span><b>¥{{ cart.checkout.goodsAmount.toLocaleString() }}</b></p>
+            <p><span>运费</span><b>{{ cart.checkout.shippingAmount === 0 ? '免运费' : `¥${cart.checkout.shippingAmount}` }}</b></p>
+            <p><span>应付金额</span><strong>¥{{ cart.checkout.payableAmount.toLocaleString() }}</strong></p>
+          </div>
+          <button class="checkout-button" :disabled="cart.loading || cart.data.selectedQuantity === 0" @click="previewCheckout">
+            {{ cart.loading ? '正在计算…' : cart.checkout ? '确认结算信息' : '结算预览' }}
+          </button>
+          <small>满 ¥299 免运费 · 当前阶段仅生成结算预览</small>
+        </footer>
+      </aside>
     </div>
   </div>
 </template>
