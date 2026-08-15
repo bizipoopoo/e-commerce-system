@@ -31,3 +31,8 @@ info:
     name: Aurora Commerce
     stage: development
 
+commerce:
+  web:
+    allowed-origins:
+      - ${STOREFRONT_ORIGIN:http://localhost:5173}
+      - ${ADMIN_ORIGIN:http://localhost:5174}

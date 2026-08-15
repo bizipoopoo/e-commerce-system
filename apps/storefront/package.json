@@ -9,9 +9,9 @@
     "preview": "vite preview --port 4173"
   },
   "dependencies": {
-    "@vitejs/plugin-vue": "latest",
-    "vite": "latest",
-    "vue": "latest"
+    "@vitejs/plugin-vue": "6.0.8",
+    "vite": "8.2.1",
+    "vue": "3.5.41"
   },
   "devDependencies": {
     "typescript": "5.9.3",

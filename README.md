@@ -5,8 +5,8 @@ Aurora Commerce 是一套面向 Web 的全功能电商演示系统。项目采�
 ## 当前基线
 
 - 后端：Java 21、Spring Boot、Spring Modulith、Spring Security、JPA、Flyway
-- 用户端：Vue 3、TypeScript、Vite、Pinia
-- 运营端：Vue 3、TypeScript、Vite、ECharts
+- 用户端：Vue 3、TypeScript、Vite
+- 运营端：Vue 3、TypeScript、Vite
 - 本地默认：H2 内存数据库，无需 Docker
 - 完整环境：MySQL、Redis，使用 Docker Compose
 
@@ -50,4 +50,4 @@ npm run dev:admin
 - [数据模型](docs/03-data-model.md)
 - [API 设计](docs/04-api-design.md)
 - [一周交付计划](docs/05-delivery-plan.md)
-
+- [阶段研发与 Code Review 流程](docs/06-engineering-workflow.md)
