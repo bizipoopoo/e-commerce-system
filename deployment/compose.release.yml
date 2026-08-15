@@ -1,0 +1,61 @@
+name: aurora-commerce-${DEPLOY_ENVIRONMENT:?DEPLOY_ENVIRONMENT is required}
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-aurora_commerce}
+      MYSQL_USER: ${MYSQL_USER:-aurora}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  backend:
+    image: ${BACKEND_IMAGE:?BACKEND_IMAGE digest reference is required}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      DB_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-aurora_commerce}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      DB_USERNAME: ${MYSQL_USER:-aurora}
+      DB_PASSWORD: ${MYSQL_PASSWORD:?MYSQL_PASSWORD is required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+      DEMO_ADMIN_EMAIL: ${DEMO_ADMIN_EMAIL:-admin@aurora.local}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:?DEMO_ADMIN_PASSWORD is required}
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  storefront:
+    image: ${STOREFRONT_IMAGE:?STOREFRONT_IMAGE digest reference is required}
+    restart: unless-stopped
+    ports:
+      - "${STOREFRONT_BIND_ADDRESS:-127.0.0.1}:${STOREFRONT_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  admin-web:
+    image: ${ADMIN_IMAGE:?ADMIN_IMAGE digest reference is required}
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_BIND_ADDRESS:-127.0.0.1}:${ADMIN_PORT:-3001}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  mysql-data:

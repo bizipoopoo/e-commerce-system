@@ -5,6 +5,10 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -12,11 +16,12 @@ jobs:
   backend:
     name: Backend tests
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
@@ -27,9 +32,10 @@ jobs:
   web:
     name: Web production build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -39,17 +45,28 @@ jobs:
   delivery:
     name: Compose delivery smoke test
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       MYSQL_PASSWORD: aurora-ci-database-password
       MYSQL_ROOT_PASSWORD: aurora-ci-root-password
       JWT_SECRET: aurora-commerce-ci-signing-secret-2026-minimum-32-bytes
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '22'
+      - name: Test deployment rollback orchestration
+        run: bash scripts/test-deploy.sh
       - name: Validate Docker Compose
         run: docker compose config --quiet
+      - name: Validate release Docker Compose
+        env:
+          DEPLOY_ENVIRONMENT: staging
+          DEMO_ADMIN_PASSWORD: aurora-ci-admin-password
+          BACKEND_IMAGE: ghcr.io/bizipoopoo/aurora-commerce-backend@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          STOREFRONT_IMAGE: ghcr.io/bizipoopoo/aurora-commerce-storefront@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          ADMIN_IMAGE: ghcr.io/bizipoopoo/aurora-commerce-admin@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+        run: docker compose -f deployment/compose.release.yml config --quiet
       - name: Build, start and verify the demo stack
         shell: bash
         run: |
@@ -58,7 +75,7 @@ jobs:
             trap - EXIT
             if [ "$status" -ne 0 ]; then
               docker compose ps
-              docker compose logs --no-color
+              docker compose logs --no-color | tee compose-smoke.log
             fi
             docker compose down --volumes
             exit "$status"
@@ -73,3 +90,11 @@ jobs:
           done
           curl --fail --silent http://localhost:3000/actuator/health > /dev/null
           SMOKE_BASE_URL=http://localhost:3000 npm run smoke
+      - name: Upload failure logs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compose-smoke-logs
+          path: compose-smoke.log
+          if-no-files-found: ignore
+          retention-days: 7

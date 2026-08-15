@@ -1,0 +1,152 @@
+name: Release Images
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+
+jobs:
+  validate:
+    name: Validate release tag
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      release: ${{ steps.release.outputs.value }}
+      commit-tag: ${{ steps.release.outputs.commit }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Validate semantic version
+        id: release
+        shell: bash
+        run: |
+          release="${GITHUB_REF_NAME}"
+          if [[ ! "$release" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+            echo "Release tag must look like v1.2.3 or v1.2.3-rc.1" >&2
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "Release tags must point to a commit contained in main" >&2
+            exit 1
+          fi
+          echo "value=$release" >> "$GITHUB_OUTPUT"
+          echo "commit=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+
+  verify-backend:
+    name: Verify backend
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - run: mvn --batch-mode test
+        working-directory: backend
+
+  verify-web:
+    name: Verify web
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+
+  publish:
+    name: Publish ${{ matrix.image }}
+    needs: [validate, verify-backend, verify-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: aurora-commerce-backend
+            dockerfile: backend/Dockerfile
+          - image: aurora-commerce-storefront
+            dockerfile: apps/storefront/Dockerfile
+          - image: aurora-commerce-admin
+            dockerfile: apps/admin-web/Dockerfile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/metadata-action@v6
+        id: meta
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAMESPACE }}/${{ matrix.image }}
+          tags: |
+            type=raw,value=${{ needs.validate.outputs.release }}
+            type=raw,value=${{ needs.validate.outputs.commit-tag }}
+          labels: |
+            org.opencontainers.image.title=${{ matrix.image }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ needs.validate.outputs.release }}
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+          provenance: mode=max
+          sbom: true
+
+  summary:
+    name: Publish release summary
+    needs: [validate, publish]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Write summary
+        run: |
+          {
+            echo "## Aurora Commerce ${{ needs.validate.outputs.release }}"
+            echo
+            echo "Published three multi-platform images with provenance and SBOM."
+            echo
+            echo "Use this commit-addressable tag for staging:"
+            echo
+            echo "\`${{ needs.validate.outputs.commit-tag }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-staging:
+    name: Auto-deploy staging
+    needs: [validate, publish]
+    if: vars.AUTO_DEPLOY_STAGING == 'true'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: staging
+      release: ${{ needs.validate.outputs.commit-tag }}

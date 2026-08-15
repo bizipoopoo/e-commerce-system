@@ -75,6 +75,8 @@ npm run smoke  # 需先启动本地后端或 Compose 环境
 
 GitHub Actions 对每次 `main` 推送和 Pull Request 自动执行后端测试、双端生产构建、Compose 配置校验和核心交易冒烟。
 
+版本发布使用语义化标签，例如 `v0.2.0`。`Release Images` 会向 GHCR 发布后端、商城和运营端多架构镜像；`Deploy Environment` 负责 staging/production 审批、digest 固定、远端健康检查与失败回滚。启用步骤见 [CI/CD 自动化实施方案](docs/cicd-implementation.md)。
+
 ## 产品与技术文档
 
 - [产品需求文档](docs/01-prd.md)
@@ -86,11 +88,13 @@ GitHub Actions 对每次 `main` 推送和 Pull Request 自动执行后端测试�
 - [部署手册](docs/deployment.md)
 - [10 分钟演示脚本](docs/demo-script.md)
 - [最终回归报告](docs/final-regression-report.md)
+- [CI/CD 自动化实施方案](docs/cicd-implementation.md)
 - [Stage 02：身份、商品与首页数据化](docs/stages/stage-02-identity-catalog.md)
 - [Stage 03：库存、购物车与结算预览](docs/stages/stage-03-inventory-cart-checkout.md)
 - [Stage 04：订单、支付与履约](docs/stages/stage-04-orders-payments-fulfillment.md)
 - [Stage 05：营销、内容、推荐与消息](docs/stages/stage-05-marketing-content-recommendation-notifications.md)
 - [Stage 06：售后、互动与运营工作台](docs/stages/stage-06-after-sales-engagement-operations.md)
 - [Stage 07：部署、演示与交付](docs/stages/stage-07-delivery-deployment-demo.md)
+- [Stage 08：CI/CD 自动化研究与实施](docs/stages/stage-08-cicd-automation.md)
 
-至此 Day 1–Day 7 的计划功能均已实现；各阶段 Code Review 记录位于 [`docs/reviews`](docs/reviews)。
+Day 1–Day 7 的 Demo 计划功能已实现，Stage 08 在此基础上补充版本镜像、环境审批、自动部署与回滚；各阶段 Code Review 记录位于 [`docs/reviews`](docs/reviews)。

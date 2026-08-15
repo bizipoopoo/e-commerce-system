@@ -1,0 +1,199 @@
+name: Deploy Environment
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub Environment to deploy
+        required: true
+        type: string
+      release:
+        description: Commit-addressable sha-* tag or semantic v* tag
+        required: true
+        type: string
+      backend_image:
+        description: Optional backend digest reference; required for production
+        required: false
+        type: string
+      storefront_image:
+        description: Optional storefront digest reference; required for production
+        required: false
+        type: string
+      admin_image:
+        description: Optional admin digest reference; required for production
+        required: false
+        type: string
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      release:
+        description: Commit sha-<40 hex> or semantic v1.2.3 tag
+        required: true
+        type: string
+      backend_image:
+        description: Production requires the backend @sha256 ref from staging summary
+        required: false
+        type: string
+      storefront_image:
+        description: Production requires the storefront @sha256 ref from staging summary
+        required: false
+        type: string
+      admin_image:
+        description: Production requires the admin @sha256 ref from staging summary
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  deployments: write
+  packages: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAMESPACE: ${{ github.repository_owner }}
+  RELEASE_VERSION: ${{ inputs.release }}
+  DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+  DEPLOY_PATH: /opt/aurora-commerce-${{ inputs.environment }}
+  REQUESTED_BACKEND_IMAGE: ${{ inputs.backend_image }}
+  REQUESTED_STOREFRONT_IMAGE: ${{ inputs.storefront_image }}
+  REQUESTED_ADMIN_IMAGE: ${{ inputs.admin_image }}
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.release }} to ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ vars.DEPLOY_URL }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate release input
+        shell: bash
+        run: |
+          if [[ ! "$DEPLOY_ENVIRONMENT" =~ ^(staging|production)$ ]]; then
+            echo "Environment must be staging or production" >&2
+            exit 1
+          fi
+      - name: Validate deployment connection
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          if [[ -z "$DEPLOY_HOST" || -z "$DEPLOY_USER" || -z "$DEPLOY_SSH_KEY" || -z "$DEPLOY_KNOWN_HOSTS" ]]; then
+            echo "The target Environment is missing required deployment Secrets" >&2
+            exit 1
+          fi
+          if [[ ! "$port" =~ ^[0-9]{1,5}$ ]] || (( port < 1 || port > 65535 )); then
+            echo "DEPLOY_PORT must be between 1 and 65535" >&2
+            exit 1
+          fi
+          if [[ ! "$RELEASE_VERSION" =~ ^(sha-[0-9a-f]{40}|v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?)$ ]]; then
+            echo "Release must be sha-<40 hex> or a semantic v1.2.3 tag" >&2
+            exit 1
+          fi
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v4
+      - name: Resolve published images to digests
+        id: images
+        shell: bash
+        run: |
+          resolve_image() {
+            local image="$1"
+            local requested="$2"
+            local tagged="$REGISTRY/$IMAGE_NAMESPACE/aurora-commerce-$image:$RELEASE_VERSION"
+            local expected_image="${tagged%:*}"
+            local digest
+            if [[ -n "$requested" ]]; then
+              if [[ "${requested%@*}" != "$expected_image" ]] \
+                || [[ ! "${requested#*@}" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+                echo "Invalid digest reference for $image" >&2
+                exit 1
+              fi
+              printf '%s' "$requested"
+              return
+            fi
+            digest="$(docker buildx imagetools inspect "$tagged" --format '{{.Manifest.Digest}}')"
+            if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "Could not resolve a registry digest for $tagged" >&2
+              exit 1
+            fi
+            printf '%s@%s' "$expected_image" "$digest"
+          }
+          if [[ "$DEPLOY_ENVIRONMENT" == "production" ]] \
+            && [[ -z "$REQUESTED_BACKEND_IMAGE" || -z "$REQUESTED_STOREFRONT_IMAGE" || -z "$REQUESTED_ADMIN_IMAGE" ]]; then
+            echo "Production promotion requires all three digest references from the staging deployment summary." >&2
+            exit 1
+          fi
+          echo "backend=$(resolve_image backend "$REQUESTED_BACKEND_IMAGE")" >> "$GITHUB_OUTPUT"
+          echo "storefront=$(resolve_image storefront "$REQUESTED_STOREFRONT_IMAGE")" >> "$GITHUB_OUTPUT"
+          echo "admin=$(resolve_image admin "$REQUESTED_ADMIN_IMAGE")" >> "$GITHUB_OUTPUT"
+      - name: Configure SSH
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          chmod 600 "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+      - name: Upload deployment bundle
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" "mkdir -p '$DEPLOY_PATH'"
+          scp -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 -P "$port" \
+            deployment/compose.release.yml deployment/deploy.sh deployment/release.env.example \
+            "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+      - name: Deploy and verify
+        shell: bash
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_PORT: ${{ secrets.DEPLOY_PORT }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          BACKEND_IMAGE: ${{ steps.images.outputs.backend }}
+          STOREFRONT_IMAGE: ${{ steps.images.outputs.storefront }}
+          ADMIN_IMAGE: ${{ steps.images.outputs.admin }}
+        run: |
+          port="${DEPLOY_PORT:-22}"
+          ssh -o BatchMode=yes -o IdentitiesOnly=yes -o ConnectTimeout=15 \
+            -p "$port" "$DEPLOY_USER@$DEPLOY_HOST" \
+            "cd '$DEPLOY_PATH' && chmod 700 deploy.sh && ./deploy.sh '$RELEASE_VERSION' '$DEPLOY_ENVIRONMENT' '$BACKEND_IMAGE' '$STOREFRONT_IMAGE' '$ADMIN_IMAGE'"
+      - name: Write deployment summary
+        run: |
+          {
+            echo "## Deployment succeeded"
+            echo
+            echo "- Environment: ${{ inputs.environment }}"
+            echo "- Release: \`$RELEASE_VERSION\`"
+            echo "- Backend: \`${{ steps.images.outputs.backend }}\`"
+            echo "- Storefront: \`${{ steps.images.outputs.storefront }}\`"
+            echo "- Admin: \`${{ steps.images.outputs.admin }}\`"
+            echo "- Actor: @${{ github.actor }}"
+          } >> "$GITHUB_STEP_SUMMARY"
