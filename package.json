@@ -10,7 +10,8 @@
     "dev:admin": "npm run dev -w @aurora/admin-web",
     "build": "npm run build --workspaces --if-present",
     "build:storefront": "npm run build -w @aurora/storefront",
-    "build:admin": "npm run build -w @aurora/admin-web"
+    "build:admin": "npm run build -w @aurora/admin-web",
+    "smoke": "node scripts/smoke-test.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3"

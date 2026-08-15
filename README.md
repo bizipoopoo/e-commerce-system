@@ -8,7 +8,7 @@ Aurora Commerce 是一套面向 Web 的全功能电商演示系统。项目采�
 - 用户端：Vue 3、TypeScript、Vite、Pinia
 - 运营端：Vue 3、TypeScript、Vite
 - 本地默认：H2 内存数据库，无需 Docker
-- 完整环境：MySQL、Redis，使用 Docker Compose
+- 演示部署：MySQL 8.4、Docker Compose、Nginx 同源反向代理
 
 ## 工程结构
 
@@ -48,7 +48,32 @@ npm run dev:admin
 - 邮箱：`admin@aurora.local`
 - 密码：`Aurora@2026`
 
-生产环境必须启用 `prod` Profile，并提供 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 和不少于 32 字节的 `JWT_SECRET`。生产 Profile 不创建演示管理员，也不加载演示数据。
+### Docker 一键演示
+
+```bash
+cp .env.example .env
+# 编辑 .env，替换数据库密码和 JWT_SECRET
+docker compose up --build -d
+npm run smoke
+```
+
+容器启动后访问：
+
+- 商城：`http://localhost:3000`
+- 运营后台：`http://localhost:3001`
+- 后端健康检查：`http://localhost:8080/actuator/health`
+
+Docker 演示环境默认管理员仍为 `admin@aurora.local` / `Aurora@2026`。详见[部署手册](docs/deployment.md)。生产环境必须仅启用 `prod` Profile，并提供 `DB_URL`、`DB_USERNAME`、`DB_PASSWORD` 和不少于 32 字节的随机 `JWT_SECRET`；生产 Profile 不创建演示管理员，也不加载演示数据。
+
+## 质量门禁
+
+```bash
+cd backend && mvn test
+cd .. && npm ci && npm run build
+npm run smoke  # 需先启动本地后端或 Compose 环境
+```
+
+GitHub Actions 对每次 `main` 推送和 Pull Request 自动执行后端测试、双端生产构建、Compose 配置校验和核心交易冒烟。
 
 ## 产品与技术文档
 
@@ -58,8 +83,14 @@ npm run dev:admin
 - [API 设计](docs/04-api-design.md)
 - [一周交付计划](docs/05-delivery-plan.md)
 - [阶段研发与 Code Review 流程](docs/06-engineering-workflow.md)
+- [部署手册](docs/deployment.md)
+- [10 分钟演示脚本](docs/demo-script.md)
+- [最终回归报告](docs/final-regression-report.md)
 - [Stage 02：身份、商品与首页数据化](docs/stages/stage-02-identity-catalog.md)
 - [Stage 03：库存、购物车与结算预览](docs/stages/stage-03-inventory-cart-checkout.md)
 - [Stage 04：订单、支付与履约](docs/stages/stage-04-orders-payments-fulfillment.md)
 - [Stage 05：营销、内容、推荐与消息](docs/stages/stage-05-marketing-content-recommendation-notifications.md)
 - [Stage 06：售后、互动与运营工作台](docs/stages/stage-06-after-sales-engagement-operations.md)
+- [Stage 07：部署、演示与交付](docs/stages/stage-07-delivery-deployment-demo.md)
+
+至此 Day 1–Day 7 的计划功能均已实现；各阶段 Code Review 记录位于 [`docs/reviews`](docs/reviews)。

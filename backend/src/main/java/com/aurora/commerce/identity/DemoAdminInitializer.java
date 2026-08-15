@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-@Profile("local")
+@Profile({"local", "demo"})
 class DemoAdminInitializer implements ApplicationRunner {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(DemoAdminInitializer.class);

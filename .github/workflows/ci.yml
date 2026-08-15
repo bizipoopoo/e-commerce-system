@@ -35,3 +35,41 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+
+  delivery:
+    name: Compose delivery smoke test
+    runs-on: ubuntu-latest
+    env:
+      MYSQL_PASSWORD: aurora-ci-database-password
+      MYSQL_ROOT_PASSWORD: aurora-ci-root-password
+      JWT_SECRET: aurora-commerce-ci-signing-secret-2026-minimum-32-bytes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate Docker Compose
+        run: docker compose config --quiet
+      - name: Build, start and verify the demo stack
+        shell: bash
+        run: |
+          cleanup() {
+            status=$?
+            trap - EXIT
+            if [ "$status" -ne 0 ]; then
+              docker compose ps
+              docker compose logs --no-color
+            fi
+            docker compose down --volumes
+            exit "$status"
+          }
+          trap cleanup EXIT
+          docker compose up --build --detach
+          for attempt in {1..90}; do
+            if curl --fail --silent http://localhost:3000/actuator/health > /dev/null; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent http://localhost:3000/actuator/health > /dev/null
+          SMOKE_BASE_URL=http://localhost:3000 npm run smoke
