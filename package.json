@@ -14,12 +14,12 @@
     "smoke": "node scripts/smoke-test.mjs"
   },
   "devDependencies": {
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   },
   "engines": {
     "node": ">=20"
   },
   "overrides": {
-    "typescript": "5.9.3"
+    "typescript": "7.0.2"
   }
 }
