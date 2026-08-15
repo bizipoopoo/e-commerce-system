@@ -24,6 +24,8 @@
 |---|---|---|
 | P1 | `DemoAdminInitializer` 仅标注 `local` Profile，Compose 使用 `prod,demo` 时不会创建演示管理员，导致运营登录和 smoke 失败 | Profile 改为 `local` 或 `demo`；以 `local,demo` 真实启动并成功执行管理员登录、完整 smoke 和浏览器运营看板验收 |
 | P2 | 初版 CI 仅执行 `docker compose config`，核心 smoke 仍运行在本地 H2 进程，不能证明 Dockerfile、MySQL、Profile 与 Nginx 能协同 | CI 改为真实 `docker compose up --build --detach`，经商城 `:3000` 代理执行 smoke，失败输出全量容器状态/日志，结束后清理数据卷 |
+| P1 | Quality Gate #7 运行态验证发现仓库同时存在旧 `compose.yml` 与新增 `docker-compose.yml`，Compose 自动选择前者，只启动 MySQL/Redis，商城入口始终不可用 | 将完整四服务编排合并到仓库原有的标准 `compose.yml` 并删除重复文件，确保本地与 CI 命令解析同一拓扑；由下一次 Quality Gate 复验 |
+| P3 | 首次推送后 GitHub 提示 Actions v4 基于已弃用的 Node.js 20 runtime，且 `setup-java@v4` 不再维护 | `checkout`、`setup-java`、`setup-node` 全部升级至 v5，并由最终一次 Quality Gate 复验 |
 
 ## 验证结果
 

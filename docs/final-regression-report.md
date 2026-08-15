@@ -4,7 +4,7 @@
 
 截至 2026-08-15，Day 1–Day 7 计划内的 Demo 能力已完成开发与本地回归。后端测试、双端生产构建、核心交易冒烟、商城/运营端浏览器验收、配置语法和 Diff 检查均通过；Stage 07 Review 发现的问题已修复，P0/P1 遗留为 0。
 
-Docker 运行时未安装在当前开发机，因此本地无法执行镜像构建；GitHub Actions 的 `Compose delivery smoke test` 会在 Linux Docker 环境真实构建四服务栈，并通过商城 Nginx 入口再次执行同一套 smoke。最终提交推送后补充该次 Actions 结果。
+Docker 运行时未安装在当前开发机，因此本地无法执行镜像构建；[GitHub Actions Quality Gate](https://github.com/bizipoopoo/e-commerce-system/actions/workflows/ci.yml) 的 `Compose delivery smoke test` 会在 Linux Docker 环境真实构建四服务栈，并通过商城 Nginx 入口再次执行同一套 smoke。最终交付只在最新 `main` 的三个 job 全部成功后成立。
 
 ## 自动化回归矩阵
 
@@ -17,7 +17,7 @@ Docker 运行时未安装在当前开发机，因此本地无法执行镜像构�
 | 脚本语法 | `node --check scripts/smoke-test.mjs` | 通过 |
 | YAML 静态解析 | Compose、Actions、demo Profile | 通过 |
 | Git Diff | `git diff --check` | 通过 |
-| Compose 运行态 | GitHub-hosted Ubuntu + Docker | 提交后由 Quality Gate 执行并回填 |
+| Compose 运行态 | GitHub-hosted Ubuntu + Docker | 由最新 `main` Quality Gate 构建四服务并执行同源代理 smoke |
 
 ## 冒烟覆盖
 
