@@ -1,5 +1,8 @@
 # Aurora Commerce
 
+[![Quality Gate](https://github.com/bizipoopoo/e-commerce-system/actions/workflows/ci.yml/badge.svg)](https://github.com/bizipoopoo/e-commerce-system/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+
 Aurora Commerce 是一套面向 Web 的全功能电商演示系统。项目采用“核心交易真实闭环、外围能力可演示、模块边界可扩展”的建设策略，用一周形成可运行、可讲解、可继续演进的产品基座。
 
 ## 当前基线
@@ -96,5 +99,12 @@ GitHub Actions 对每次 `main` 推送和 Pull Request 自动执行后端测试�
 - [Stage 06：售后、互动与运营工作台](docs/stages/stage-06-after-sales-engagement-operations.md)
 - [Stage 07：部署、演示与交付](docs/stages/stage-07-delivery-deployment-demo.md)
 - [Stage 08：CI/CD 自动化研究与实施](docs/stages/stage-08-cicd-automation.md)
+- [Stage 09：开源化与社区协作基线](docs/stages/stage-09-open-source-readiness.md)
 
-Day 1–Day 7 的 Demo 计划功能已实现，Stage 08 在此基础上补充版本镜像、环境审批、自动部署与回滚；各阶段 Code Review 记录位于 [`docs/reviews`](docs/reviews)。
+Day 1–Day 7 的 Demo 计划功能已实现，Stage 08 补充版本镜像、环境审批、自动部署与回滚，Stage 09 建立开源许可证与社区协作基线；各阶段 Code Review 记录位于 [`docs/reviews`](docs/reviews)。
+
+## 参与贡献
+
+欢迎提交 Issue 和 Pull Request。开始前请阅读[贡献指南](CONTRIBUTING.md)与[行为准则](CODE_OF_CONDUCT.md)；安全漏洞请按照[安全政策](SECURITY.md)进行私密披露。
+
+本项目采用 [Apache License 2.0](LICENSE) 开源，可用于学习、修改、分发和商业场景；使用与再分发时请遵守许可证条款。

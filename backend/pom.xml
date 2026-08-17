@@ -16,6 +16,21 @@
     <version>0.1.0-SNAPSHOT</version>
     <name>Aurora Commerce</name>
     <description>Extensible commerce demo built as a modular monolith</description>
+    <url>https://github.com/bizipoopoo/e-commerce-system</url>
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+    <scm>
+        <connection>scm:git:https://github.com/bizipoopoo/e-commerce-system.git</connection>
+        <developerConnection>scm:git:git@github.com:bizipoopoo/e-commerce-system.git</developerConnection>
+        <url>https://github.com/bizipoopoo/e-commerce-system</url>
+    </scm>
 
     <properties>
         <java.version>21</java.version>
